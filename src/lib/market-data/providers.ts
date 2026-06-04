@@ -6,6 +6,7 @@ import type {
   MarketQuote,
 } from "@/lib/market-data/types";
 import type { CurrencyCode } from "@/lib/types";
+import type { MarketDataProviderName } from "@/lib/types";
 
 async function safeJson(url: string) {
   try {
@@ -234,4 +235,14 @@ export function createConfiguredProviders() {
     createAlphaVantageProvider(process.env.ALPHA_VANTAGE_API_KEY),
     createTwelveDataProvider(process.env.TWELVE_DATA_API_KEY),
   ].filter((provider): provider is MarketDataProvider => Boolean(provider));
+}
+
+export function createProviderByName(
+  provider: MarketDataProviderName,
+  apiKey?: string
+) {
+  if (provider === "finnhub") return createFinnhubProvider(apiKey);
+  if (provider === "fmp") return createFmpProvider(apiKey);
+  if (provider === "alpha_vantage") return createAlphaVantageProvider(apiKey);
+  return createTwelveDataProvider(apiKey);
 }

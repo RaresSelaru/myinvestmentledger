@@ -54,7 +54,8 @@ export function enrichHoldings(holdings: Holding[], totalValue: number) {
 export function computePortfolioSummary(
   holdings: Holding[],
   transactions: Transaction[],
-  currency: CurrencyCode
+  currency: CurrencyCode,
+  options: { cash?: number | null; realizedPl?: number | null } = {}
 ): PortfolioSummary {
   const holdingsValue = holdings.reduce(
     (total, holding) => total + holding.marketValue,
@@ -68,7 +69,7 @@ export function computePortfolioSummary(
     (total, holding) => total + holding.unrealizedPl,
     0
   );
-  const realizedPl = holdings.reduce(
+  const realizedPl = options.realizedPl ?? holdings.reduce(
     (total, holding) => total + holding.realizedPl,
     0
   );
@@ -104,7 +105,7 @@ export function computePortfolioSummary(
     return total;
   }, 0);
 
-  const cash = round(externalCash + tradeCash, 2);
+  const cash = round(options.cash ?? externalCash + tradeCash, 2);
   const lastUpdated =
     holdings
       .map((holding) => holding.updatedAt)

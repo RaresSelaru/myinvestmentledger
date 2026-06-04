@@ -163,6 +163,7 @@ function mapTransaction(row: Record<string, unknown>): Transaction {
     sourceFingerprint: row.source_fingerprint
       ? String(row.source_fingerprint)
       : null,
+    realizedPl: nullableNumber(row.realized_pl),
   };
 }
 
@@ -193,21 +194,24 @@ export class SupabaseImportRepository implements ImportRepository {
     fileHash: string;
     sourceFingerprints: string[];
   }): Promise<ImportRestorePoint> {
+    const { data: importedFile, error: importedFileError } = await this.supabase
+      .from("imported_files")
+      .select("*")
+      .eq("user_id", input.userId)
+      .eq("broker_account_id", input.brokerAccountId)
+      .eq("file_hash", input.fileHash)
+      .maybeSingle();
+
+    if (importedFileError) throw importedFileError;
+
     const [
-      { data: importedFile, error: importedFileError },
       rawRows,
       transactions,
       positionLots,
       cashOperations,
       { data: holdings, error: holdingsError },
+      { data: snapshots, error: snapshotsError },
     ] = await Promise.all([
-      this.supabase
-        .from("imported_files")
-        .select("*")
-        .eq("user_id", input.userId)
-        .eq("broker_account_id", input.brokerAccountId)
-        .eq("file_hash", input.fileHash)
-        .maybeSingle(),
       selectInChunks(this.supabase, "raw_import_rows", input),
       selectInChunks(this.supabase, "transactions", input),
       selectInChunks(this.supabase, "position_lots", input),
@@ -217,10 +221,18 @@ export class SupabaseImportRepository implements ImportRepository {
         .select("*")
         .eq("user_id", input.userId)
         .eq("portfolio_id", input.portfolioId),
+      importedFile?.id
+        ? this.supabase
+            .from("broker_account_snapshots")
+            .select("*")
+            .eq("user_id", input.userId)
+            .eq("broker_account_id", input.brokerAccountId)
+            .eq("imported_file_id", String(importedFile.id))
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
-    if (importedFileError) throw importedFileError;
     if (holdingsError) throw holdingsError;
+    if (snapshotsError) throw snapshotsError;
 
     return {
       importedFile: importedFile
@@ -231,6 +243,7 @@ export class SupabaseImportRepository implements ImportRepository {
       positionLots,
       cashOperations,
       holdings: (holdings ?? []) as Record<string, unknown>[],
+      brokerAccountSnapshots: (snapshots ?? []) as Record<string, unknown>[],
     };
   }
 
@@ -261,6 +274,13 @@ export class SupabaseImportRepository implements ImportRepository {
       .eq("imported_file_id", input.importedFileId);
 
     await this.supabase
+      .from("broker_account_snapshots")
+      .delete()
+      .eq("user_id", input.userId)
+      .eq("broker_account_id", input.brokerAccountId)
+      .eq("imported_file_id", input.importedFileId);
+
+    await this.supabase
       .from("holdings")
       .delete()
       .eq("user_id", input.userId)
@@ -271,6 +291,11 @@ export class SupabaseImportRepository implements ImportRepository {
     await restoreRows(this.supabase, "position_lots", input.restorePoint.positionLots);
     await restoreRows(this.supabase, "cash_operations", input.restorePoint.cashOperations);
     await restoreRows(this.supabase, "holdings", input.restorePoint.holdings);
+    await restoreRows(
+      this.supabase,
+      "broker_account_snapshots",
+      input.restorePoint.brokerAccountSnapshots
+    );
 
     if (input.restorePoint.importedFile) {
       await restoreRows(this.supabase, "imported_files", [
@@ -328,6 +353,33 @@ export class SupabaseImportRepository implements ImportRepository {
       .single();
 
     if (error) throw error;
+
+    if (
+      input.meta.balance !== null ||
+      input.meta.equity !== null ||
+      input.meta.freeMargin !== null
+    ) {
+      const { error: snapshotError } = await this.supabase.from("broker_account_snapshots").upsert(
+        {
+          user_id: input.userId,
+          portfolio_id: input.portfolioId,
+          broker_account_id: input.brokerAccountId,
+          imported_file_id: String(data.id),
+          balance: input.meta.balance,
+          equity: input.meta.equity,
+          margin: input.meta.margin,
+          free_margin: input.meta.freeMargin,
+          margin_level: input.meta.marginLevel,
+          currency: input.meta.accountCurrency ?? "RON",
+          snapshot_at: input.meta.snapshotAt ?? new Date().toISOString(),
+        },
+        {
+          onConflict: "user_id,broker_account_id,imported_file_id",
+        }
+      );
+
+      if (snapshotError) throw snapshotError;
+    }
 
     return String(data.id);
   }
@@ -425,6 +477,7 @@ export class SupabaseImportRepository implements ImportRepository {
         amount: value.amount,
         currency: value.currency,
         comment: value.comment,
+        realized_pl: value.realizedPl,
         source_fingerprint: input.row.sourceFingerprint,
         full_row_hash: input.row.fullRowHash,
       },
@@ -529,6 +582,21 @@ export class SupabaseImportRepository implements ImportRepository {
           .eq("portfolio_id", input.portfolioId),
       ]);
     const baseCurrency = String(portfolioRows?.[0]?.base_currency ?? "RON");
+    const transactions = (transactionRows ?? []).map((row) =>
+      mapTransaction(row as Record<string, unknown>)
+    );
+    const realizedPlBySymbol = transactions.reduce<Record<string, number>>(
+      (totals, transaction) => {
+        if (!transaction.symbol || transaction.realizedPl === null || transaction.realizedPl === undefined) {
+          return totals;
+        }
+
+        const symbol = transaction.symbol.toUpperCase();
+        totals[symbol] = (totals[symbol] ?? 0) + transaction.realizedPl;
+        return totals;
+      },
+      {}
+    );
     const state = computePortfolioState({
       portfolioId: input.portfolioId,
       lots: (lotRows ?? []).map((row) => mapPositionLot(row as Record<string, unknown>)),
@@ -537,15 +605,14 @@ export class SupabaseImportRepository implements ImportRepository {
       ),
       targets: (targetRows ?? []).map((row) => mapTarget(row as Record<string, unknown>)),
       baseCurrency,
+      realizedPlBySymbol,
     });
     const cashOperations = (cashRows ?? []).map((row) =>
       mapCashOperation(row as Record<string, unknown>)
     );
     const internalTransferMatches = matchInternalTransfers(cashOperations, {});
     const reconciliationMatches = reconcileManualTransactions(
-      (transactionRows ?? []).map((row) =>
-        mapTransaction(row as Record<string, unknown>)
-      )
+      transactions
     );
 
     for (const match of reconciliationMatches) {

@@ -36,6 +36,7 @@ export default async function ImportsPage({ searchParams }: ImportsPageProps) {
           lots: first(params.lots),
           cash: first(params.cash),
           transactions: first(params.transactions),
+          holdings: first(params.holdings),
         }}
         dryRunAction={dryRunImportAction}
         commitAction={commitStagedImportAction}

@@ -42,6 +42,7 @@ describe("XTB workbook parser", () => {
     expect(firstCash?.cashOperation?.normalizedType).toBe("tax");
     expect(firstCash?.sourceFingerprint).toContain("xtb:broker-1:cash:");
     expect(firstClosed?.transaction?.type).toBe("sell");
+    expect(firstClosed?.transaction?.realizedPl).not.toBeNull();
   });
 
   it("handles localized numbers, dates, and XTB operation labels", () => {

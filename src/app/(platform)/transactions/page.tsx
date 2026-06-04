@@ -1,7 +1,7 @@
 import { ManualEntryDialog } from "@/components/investments/manual-entry-dialog";
 import { PageHeader } from "@/components/investments/page-header";
 import { TransactionsTable } from "@/components/investments/transactions-table";
-import { getWorkspaceData } from "@/lib/data";
+import { getActivityData } from "@/lib/data";
 
 type TransactionsPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -14,14 +14,14 @@ function first(value: string | string[] | undefined) {
 export default async function TransactionsPage({
   searchParams,
 }: TransactionsPageProps) {
-  const workspace = await getWorkspaceData();
+  const workspace = await getActivityData();
   const params = await searchParams;
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Transactions"
-        description="A traceable ledger of transactions and cash events."
+        title="Activity"
+        description="Clean broker activity, manual entries, and traceable cash events."
         actions={
           <ManualEntryDialog
             portfolio={workspace.activePortfolio}

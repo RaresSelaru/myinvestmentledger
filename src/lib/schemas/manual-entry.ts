@@ -52,3 +52,90 @@ export const stagedImportSchema = z.object({
   brokerAccountId: z.string().uuid(),
   stagedImportId: z.string().uuid().optional().or(z.literal("")),
 });
+
+const optionalPositiveNumber = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? null : value),
+  z.coerce.number().positive().nullable()
+);
+
+const optionalPercentNumber = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? null : value),
+  z.coerce.number().min(0).max(100).nullable()
+);
+
+export const targetItemSchema = z
+  .object({
+    symbol: z.string().trim().min(1).max(32),
+    targetAllocation: z.coerce.number().min(0).max(100),
+    maxAllocation: optionalPercentNumber,
+    targetBuyPrice: optionalPositiveNumber,
+    targetSellPrice: optionalPositiveNumber,
+    corePercent: z.coerce.number().min(0).max(100),
+    satellitePercent: z.coerce.number().min(0).max(100),
+  })
+  .superRefine((value, ctx) => {
+    if (
+      value.maxAllocation !== null &&
+      value.maxAllocation < value.targetAllocation
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["maxAllocation"],
+        message: "Max allocation must be greater than or equal to target allocation",
+      });
+    }
+
+    if (Math.round((value.corePercent + value.satellitePercent) * 100) / 100 !== 100) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["corePercent"],
+        message: "Core and satellite must add up to 100",
+      });
+    }
+  });
+
+export const bulkTargetsSchema = z.object({
+  portfolioId: z.string().uuid(),
+  targets: z.array(targetItemSchema).min(1).max(300),
+});
+
+export const marketDataProviderSchema = z.enum([
+  "finnhub",
+  "fmp",
+  "alpha_vantage",
+  "twelve_data",
+]);
+
+export const marketDataSettingsSchema = z.object({
+  portfolioId: z.string().uuid(),
+  livePricesEnabled: z.coerce.boolean(),
+  valuationMode: z.enum(["import_snapshot", "live_prices"]),
+  preferredProvider: z.enum([
+    "auto",
+    "finnhub",
+    "fmp",
+    "alpha_vantage",
+    "twelve_data",
+  ]),
+});
+
+export const marketDataApiKeySchema = z.object({
+  provider: marketDataProviderSchema,
+  apiKey: z.string().trim().min(4).max(300),
+});
+
+export const marketDataProviderOnlySchema = z.object({
+  provider: marketDataProviderSchema,
+});
+
+export const refreshQuotesSchema = z.object({
+  portfolioId: z.string().uuid(),
+});
+
+export const brokerCashOverrideSchema = z.object({
+  portfolioId: z.string().uuid(),
+  brokerAccountId: z.string().uuid(),
+  amount: z.coerce.number(),
+  currency: z.enum(["RON", "EUR", "USD"]),
+  comment: z.string().trim().max(300).optional().or(z.literal("")),
+});

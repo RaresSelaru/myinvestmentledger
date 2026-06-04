@@ -34,6 +34,7 @@ export type ImportResult = {
     duplicatesIgnored: number;
     correctedRows: number;
     status: "processing" | "completed" | "dry_run" | "failed";
+    holdingsPreview?: string[];
     error?: string;
   };
   meta: XtbWorkbookMeta;
@@ -82,6 +83,7 @@ export type ImportRestorePoint = {
   positionLots: Record<string, unknown>[];
   cashOperations: Record<string, unknown>[];
   holdings: Record<string, unknown>[];
+  brokerAccountSnapshots: Record<string, unknown>[];
 };
 
 export type RawRowWriteInput = {
@@ -108,6 +110,13 @@ export function dryRunXtbImport(
   input: { brokerAccountId: string; accountCurrency?: string | null }
 ): ImportResult {
   const parsed = parseXtbWorkbook(buffer, input);
+  const holdingsPreview = Array.from(
+    new Set(
+      parsed.rows
+        .map((row) => row.positionLot?.symbol)
+        .filter((symbol): symbol is string => Boolean(symbol))
+    )
+  ).slice(0, 10);
 
   return {
     importedFileId: null,
@@ -118,6 +127,7 @@ export function dryRunXtbImport(
       duplicatesIgnored: 0,
       correctedRows: 0,
       status: "dry_run",
+      holdingsPreview,
     },
   };
 }
@@ -174,6 +184,13 @@ export async function commitXtbImport({
     duplicatesIgnored: 0,
     correctedRows: 0,
     status: "processing",
+    holdingsPreview: Array.from(
+      new Set(
+        parsed.rows
+          .map((row) => row.positionLot?.symbol)
+          .filter((symbol): symbol is string => Boolean(symbol))
+      )
+    ).slice(0, 10),
   };
   const sourceFingerprints = [
     ...new Set(parsed.rows.map((row) => row.sourceFingerprint)),

@@ -11,6 +11,7 @@ import {
   LogOut,
   Menu,
   Settings2,
+  SlidersHorizontal,
   TableProperties,
   UserRound,
 } from "lucide-react";
@@ -42,9 +43,10 @@ import type { WorkspaceShellData } from "@/lib/types";
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/portfolio", label: "Portfolio", icon: BriefcaseBusiness },
-  { href: "/transactions", label: "Transactions", icon: TableProperties },
+  { href: "/transactions", label: "Activity", icon: TableProperties },
   { href: "/imports", label: "Imports", icon: ArrowDownToLine },
-  { href: "/strategy", label: "Strategy", icon: Settings2 },
+  { href: "/strategy", label: "Strategy", icon: SlidersHorizontal },
+  { href: "/settings", label: "Settings", icon: Settings2 },
 ];
 
 function initials(email: string) {
@@ -198,7 +200,7 @@ export function AppShell({
                 ) : (
                   <>
                     <DropdownMenuItem asChild>
-                      <Link href="/strategy">Portfolio settings</Link>
+                      <Link href="/settings">Settings</Link>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <form action={signOutAction}>

@@ -34,6 +34,7 @@ type ImportReportFormProps = {
     lots?: string | null;
     cash?: string | null;
     transactions?: string | null;
+    holdings?: string | null;
   };
   dryRunAction: ImportAction;
   commitAction: ImportAction;
@@ -129,9 +130,14 @@ export function ImportReportForm({
                     You can import now without selecting the Excel file again.
                   </p>
                   {result?.parsed ? (
-                    <p className="mt-2 metric-tabular text-xs text-muted-foreground">
-                      {result.parsed} rows · {result.lots ?? "0"} lots · {result.cash ?? "0"} cash rows · {result.transactions ?? "0"} ledger rows
-                    </p>
+                    <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                      <p className="metric-tabular">
+                        {result.parsed} rows · {result.lots ?? "0"} lots · {result.cash ?? "0"} cash rows · {result.transactions ?? "0"} ledger rows
+                      </p>
+                      {result.holdings ? (
+                        <p>Holdings detected: {result.holdings}</p>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               </div>

@@ -117,6 +117,15 @@ describe("finance calculations", () => {
     expect(summary.totalValue).toBe(4000);
   });
 
+  it("uses broker-reported cash when a current snapshot exists", () => {
+    const summary = computePortfolioSummary(holdings, transactions, "USD", {
+      cash: 125,
+    });
+
+    expect(summary.cash).toBe(125);
+    expect(summary.totalValue).toBe(2125);
+  });
+
   it("ranks accumulation candidates from negative drift and price factors", () => {
     const summary = computePortfolioSummary(holdings, transactions, "USD");
     const enriched = enrichHoldings(holdings, summary.totalValue);

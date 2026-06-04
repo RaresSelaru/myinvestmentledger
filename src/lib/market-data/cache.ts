@@ -23,19 +23,15 @@ export class InMemoryMarketDataCache implements MarketDataCache {
 
 export class SupabaseMarketDataCache implements MarketDataCache {
   constructor(
-    private supabase: {
-      from: (table: string) => {
-        select: (columns: string) => unknown;
-        upsert: (payload: unknown, options?: unknown) => Promise<{ error: unknown }>;
-      };
-    },
+    private supabase: { from: (table: string) => unknown },
     private userId: string
   ) {}
 
   async get<T>(key: string, dataType: MarketDataType, currency: CurrencyCode) {
-    const query = this.supabase
-      .from("market_data_cache")
-      .select("*") as {
+    const table = this.supabase.from("market_data_cache") as {
+      select: (columns: string) => unknown;
+    };
+    const query = table.select("*") as {
       eq: (column: string, value: unknown) => unknown;
     };
     const result = await (query
@@ -67,7 +63,14 @@ export class SupabaseMarketDataCache implements MarketDataCache {
   }
 
   async set<T>(entry: CachedMarketData<T>) {
-    await this.supabase.from("market_data_cache").upsert(
+    const table = this.supabase.from("market_data_cache") as {
+      upsert: (
+        payload: Record<string, unknown>,
+        options?: Record<string, unknown>
+      ) => Promise<{ error: unknown }>;
+    };
+
+    await table.upsert(
       {
         user_id: this.userId,
         symbol: entry.key.toUpperCase(),

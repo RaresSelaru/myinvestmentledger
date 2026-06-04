@@ -548,6 +548,7 @@ function normalizeCashRow(
     reconciledWithTransactionId: null,
     sourceFingerprint: base.sourceFingerprint,
     sourceReference,
+    realizedPl: null,
   } satisfies Omit<Transaction, "id" | "portfolioId" | "brokerAccountId">;
 
   return { ...base, transaction, positionLot: null, cashOperation };
@@ -583,23 +584,7 @@ function normalizeOpenPositionRow(
     sourceFingerprint: base.sourceFingerprint,
     sourceReference,
   } satisfies Omit<PositionLot, "id" | "portfolioId" | "brokerAccountId">;
-  const transaction = {
-    date: openedAt ?? new Date(0).toISOString(),
-    type: side === "sell" ? "sell" : "buy",
-    symbol,
-    quantity,
-    price: openPrice,
-    amount: costBasis,
-    currency: accountCurrency,
-    source: "xtb_import",
-    comment: "Broker-reported open position",
-    isReconciled: false,
-    reconciledWithTransactionId: null,
-    sourceFingerprint: base.sourceFingerprint,
-    sourceReference,
-  } satisfies Omit<Transaction, "id" | "portfolioId" | "brokerAccountId">;
-
-  return { ...base, transaction, positionLot, cashOperation: null };
+  return { ...base, transaction: null, positionLot, cashOperation: null };
 }
 
 function normalizeClosedPositionRow(
@@ -629,6 +614,7 @@ function normalizeClosedPositionRow(
     reconciledWithTransactionId: null,
     sourceFingerprint: base.sourceFingerprint,
     sourceReference,
+    realizedPl: grossPl,
   } satisfies Omit<Transaction, "id" | "portfolioId" | "brokerAccountId">;
 
   return { ...base, transaction, positionLot: null, cashOperation: null };

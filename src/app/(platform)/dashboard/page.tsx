@@ -22,6 +22,18 @@ export default async function DashboardPage() {
         description="Portfolio clarity, allocation discipline, and traceable numbers."
       />
 
+      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        <span className="rounded-full border border-border/70 bg-card/80 px-3 py-1">
+          Valuation: {summary.valuationSource ?? "XTB snapshot"}
+        </span>
+        <span className="rounded-full border border-border/70 bg-card/80 px-3 py-1">
+          Cash: {summary.cashSource ?? "Broker cash snapshot"}
+        </span>
+        <span className="rounded-full border border-border/70 bg-card/80 px-3 py-1">
+          Updated: {summary.updatedAt}
+        </span>
+      </div>
+
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
         <MetricCard
           label="Total portfolio value"
@@ -31,11 +43,17 @@ export default async function DashboardPage() {
               formula="Holdings market value + cash"
               inputs={[
                 {
-                  label: "Holdings + cash",
+                  label: summary.valuationSource ?? "Holdings snapshot",
                   value: formatCurrency(summary.totalValue, summary.currency),
                 },
               ]}
               updatedAt={summary.updatedAt}
+              sources={[
+                {
+                  label: "Valuation",
+                  reference: summary.valuationSource ?? "XTB import snapshot",
+                },
+              ]}
             />
           }
         />
@@ -44,7 +62,7 @@ export default async function DashboardPage() {
           value={formatCurrency(summary.cash, summary.currency)}
           explain={
             <ExplainNumber
-              formula="External cash flows + trade cash flows; internal transfers excluded from new deposits"
+              formula="Latest broker cash snapshot or manual cash override"
               inputs={[
                 {
                   label: "Cash",
@@ -52,6 +70,12 @@ export default async function DashboardPage() {
                 },
               ]}
               updatedAt={summary.updatedAt}
+              sources={[
+                {
+                  label: "Cash source",
+                  reference: summary.cashSource ?? "Broker cash snapshot",
+                },
+              ]}
             />
           }
         />

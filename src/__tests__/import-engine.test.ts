@@ -73,6 +73,7 @@ class MemoryImportRepository implements ImportRepository {
         .filter(([fingerprint]) => fingerprints.has(fingerprint))
         .map(([fingerprint, value]) => ({ fingerprint, value })),
       holdings: [],
+      brokerAccountSnapshots: [],
     };
   }
 

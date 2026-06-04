@@ -17,6 +17,14 @@ export type TransactionSource = "manual" | "xtb_import" | "system";
 
 export type CandidateKind = "accumulation" | "trimming";
 
+export type ValuationMode = "import_snapshot" | "live_prices";
+
+export type MarketDataProviderName =
+  | "finnhub"
+  | "fmp"
+  | "alpha_vantage"
+  | "twelve_data";
+
 export type Portfolio = {
   id: string;
   name: string;
@@ -50,6 +58,7 @@ export type Transaction = {
   reconciledWithTransactionId?: string | null;
   sourceFingerprint?: string | null;
   sourceReference?: SourceReference | null;
+  realizedPl?: number | null;
 };
 
 export type Holding = {
@@ -90,6 +99,30 @@ export type PortfolioSummary = {
   realizedPl: number;
   currency: CurrencyCode;
   updatedAt: string;
+  valuationMode?: ValuationMode;
+  valuationSource?: string;
+  cashSource?: string;
+  dataStatus?: "snapshot" | "live" | "stale" | "partial";
+};
+
+export type MarketDataSettings = {
+  livePricesEnabled: boolean;
+  valuationMode: ValuationMode;
+  preferredProvider: MarketDataProviderName | "auto";
+};
+
+export type MarketDataApiKeyStatus = {
+  provider: MarketDataProviderName;
+  enabled: boolean;
+  keyLast4: string | null;
+  updatedAt: string | null;
+};
+
+export type BrokerCashOverride = {
+  brokerAccountId: string;
+  amount: number;
+  currency: CurrencyCode;
+  comment: string | null;
 };
 
 export type Candidate = {
@@ -171,8 +204,34 @@ export type WorkspaceData = {
   holdings: HoldingView[];
   transactions: Transaction[];
   summary: PortfolioSummary;
+  marketDataSettings?: MarketDataSettings;
   accumulationCandidates: Candidate[];
   trimmingCandidates: Candidate[];
+};
+
+export type StrategyData = Pick<
+  WorkspaceData,
+  | "isPreview"
+  | "isLocked"
+  | "userEmail"
+  | "portfolios"
+  | "activePortfolio"
+  | "brokerAccounts"
+  | "holdings"
+>;
+
+export type SettingsData = Pick<
+  WorkspaceData,
+  | "isPreview"
+  | "isLocked"
+  | "userEmail"
+  | "portfolios"
+  | "activePortfolio"
+  | "brokerAccounts"
+> & {
+  marketDataSettings: MarketDataSettings;
+  apiKeys: MarketDataApiKeyStatus[];
+  cashOverrides: BrokerCashOverride[];
 };
 
 export type WorkspaceShellData = Pick<

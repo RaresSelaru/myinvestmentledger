@@ -1,12 +1,18 @@
 import { cookies } from "next/headers";
 import { cache } from "react";
-import { computePortfolioSummary, enrichHoldings, rankCandidates } from "@/lib/finance";
+import { computePortfolioSummary, enrichHoldings, rankCandidates, round } from "@/lib/finance";
 import { getPreviewWorkspaceData } from "@/lib/mock-data";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
+  BrokerCashOverride,
   BrokerAccount,
   Holding,
+  MarketDataApiKeyStatus,
+  MarketDataProviderName,
+  MarketDataSettings,
   Portfolio,
+  SettingsData,
+  StrategyData,
   Transaction,
   WorkspaceData,
   WorkspaceShellData,
@@ -15,6 +21,12 @@ import type {
 type SupabaseClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 
 const ACTIVE_PORTFOLIO_COOKIE = "mil_active_portfolio_id";
+
+const DEFAULT_MARKET_SETTINGS: MarketDataSettings = {
+  livePricesEnabled: false,
+  valuationMode: "import_snapshot",
+  preferredProvider: "auto",
+};
 
 async function createDefaultWorkspace(
   supabase: SupabaseClient,
@@ -83,6 +95,44 @@ function numberFrom(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function latestSnapshotCash(
+  rows: Record<string, unknown>[],
+  overrides: BrokerCashOverride[] = []
+) {
+  const latestByBroker = new Map<string, Record<string, unknown>>();
+  const overrideByBroker = new Map(
+    overrides.map((override) => [override.brokerAccountId, override])
+  );
+
+  for (const row of rows) {
+    const brokerAccountId = String(row.broker_account_id ?? "");
+    if (brokerAccountId && !latestByBroker.has(brokerAccountId)) {
+      latestByBroker.set(brokerAccountId, row);
+    }
+  }
+
+  if (!latestByBroker.size && !overrideByBroker.size) {
+    return null;
+  }
+
+  const snapshotTotal = Array.from(latestByBroker.values()).reduce((total, row) => {
+    const brokerAccountId = String(row.broker_account_id ?? "");
+
+    if (overrideByBroker.has(brokerAccountId)) {
+      return total;
+    }
+
+    const cashValue = row.free_margin ?? row.balance;
+    return total + numberFrom(cashValue);
+  }, 0);
+  const overrideTotal = Array.from(overrideByBroker.values()).reduce(
+    (total, override) => total + override.amount,
+    0
+  );
+
+  return snapshotTotal + overrideTotal;
+}
+
 function mapHolding(row: Record<string, unknown>): Holding {
   return {
     id: String(row.id),
@@ -136,6 +186,189 @@ function mapTransaction(row: Record<string, unknown>): Transaction {
     sourceFingerprint: row.source_fingerprint
       ? String(row.source_fingerprint)
       : null,
+    realizedPl:
+      row.realized_pl === null || row.realized_pl === undefined
+        ? null
+        : numberFrom(row.realized_pl),
+  };
+}
+
+function mapMarketDataSettings(row?: Record<string, unknown> | null): MarketDataSettings {
+  if (!row) {
+    return DEFAULT_MARKET_SETTINGS;
+  }
+
+  return {
+    livePricesEnabled: Boolean(row.live_prices_enabled),
+    valuationMode:
+      String(row.valuation_mode) === "live_prices"
+        ? "live_prices"
+        : "import_snapshot",
+    preferredProvider: [
+      "auto",
+      "finnhub",
+      "fmp",
+      "alpha_vantage",
+      "twelve_data",
+    ].includes(String(row.preferred_provider))
+      ? (String(row.preferred_provider) as MarketDataSettings["preferredProvider"])
+      : "auto",
+  };
+}
+
+function mapApiKey(row: Record<string, unknown>): MarketDataApiKeyStatus {
+  return {
+    provider: String(row.provider) as MarketDataProviderName,
+    enabled: Boolean(row.enabled),
+    keyLast4: row.key_last4 ? String(row.key_last4) : null,
+    updatedAt: row.updated_at ? String(row.updated_at) : null,
+  };
+}
+
+function mapCashOverride(row: Record<string, unknown>): BrokerCashOverride {
+  return {
+    brokerAccountId: String(row.broker_account_id),
+    amount: numberFrom(row.amount),
+    currency: String(row.currency ?? "RON"),
+    comment: row.comment ? String(row.comment) : null,
+  };
+}
+
+function isVisibleActivity(transaction: Transaction) {
+  if (transaction.source !== "xtb_import") {
+    return true;
+  }
+
+  const comment = transaction.comment ?? "";
+
+  if (comment === "Broker-reported open position") {
+    return false;
+  }
+
+  if (/^Profit of position/i.test(comment)) {
+    return false;
+  }
+
+  if (/^CLOSE (BUY|SELL)/i.test(comment)) {
+    return false;
+  }
+
+  return true;
+}
+
+function newestRow(rows: Record<string, unknown>[]) {
+  return rows
+    .filter((row) => row.fetched_at || row.as_of)
+    .sort((a, b) =>
+      String(b.fetched_at ?? b.as_of).localeCompare(String(a.fetched_at ?? a.as_of))
+    )[0];
+}
+
+function payloadObject(row: Record<string, unknown>) {
+  return typeof row.payload === "object" && row.payload !== null
+    ? (row.payload as Record<string, unknown>)
+    : {};
+}
+
+function applyLiveValuation(input: {
+  holdings: Holding[];
+  marketRows: Record<string, unknown>[];
+  baseCurrency: string;
+  settings: MarketDataSettings;
+}) {
+  if (
+    !input.settings.livePricesEnabled ||
+    input.settings.valuationMode !== "live_prices" ||
+    !input.marketRows.length
+  ) {
+    return {
+      holdings: input.holdings,
+      source: "XTB snapshot",
+      status: "snapshot" as const,
+    };
+  }
+
+  const now = Date.now();
+  const quoteRows = new Map<string, Record<string, unknown>>();
+  const fxRows = new Map<string, Record<string, unknown>>();
+
+  for (const row of input.marketRows) {
+    const expiresAt = new Date(String(row.expires_at ?? 0)).getTime();
+    const isFresh = Number.isFinite(expiresAt) && expiresAt > now;
+
+    if (!isFresh) {
+      continue;
+    }
+
+    const dataType = String(row.data_type ?? "quote");
+    const symbol = String(row.symbol ?? "").toUpperCase();
+
+    if (dataType === "quote") {
+      quoteRows.set(symbol, newestRow([row, quoteRows.get(symbol)].filter(Boolean) as Record<string, unknown>[]));
+    } else if (dataType === "fx") {
+      fxRows.set(symbol, newestRow([row, fxRows.get(symbol)].filter(Boolean) as Record<string, unknown>[]));
+    }
+  }
+
+  let liveCount = 0;
+  const holdings = input.holdings.map((holding) => {
+    const quoteRow = quoteRows.get(holding.symbol.toUpperCase());
+
+    if (!quoteRow) {
+      return holding;
+    }
+
+    const payload = payloadObject(quoteRow);
+    const quotePrice = numberFrom(payload.price ?? quoteRow.price, NaN);
+    const quoteCurrency = String(payload.currency ?? quoteRow.currency ?? "USD");
+
+    if (!Number.isFinite(quotePrice) || quotePrice <= 0) {
+      return holding;
+    }
+
+    let convertedPrice = quotePrice;
+
+    if (quoteCurrency.toUpperCase() !== input.baseCurrency.toUpperCase()) {
+      const fxPayload = payloadObject(
+        fxRows.get(`${quoteCurrency}:${input.baseCurrency}`.toUpperCase()) ?? {}
+      );
+      const fxRate = numberFrom(fxPayload.rate, NaN);
+
+      if (!Number.isFinite(fxRate) || fxRate <= 0) {
+        return holding;
+      }
+
+      convertedPrice = quotePrice * fxRate;
+    }
+
+    liveCount += 1;
+    const marketValue = round(holding.quantity * convertedPrice, 2);
+
+    return {
+      ...holding,
+      currentPrice: round(convertedPrice, 4),
+      marketValue,
+      unrealizedPl: round(marketValue - holding.costBasis, 2),
+      updatedAt: String(quoteRow.fetched_at ?? quoteRow.as_of ?? holding.updatedAt),
+      sourceReferences: [
+        ...(holding.sourceReferences ?? []),
+        {
+          provider: String(quoteRow.provider ?? "market data"),
+          fetchedAt: String(quoteRow.fetched_at ?? quoteRow.as_of ?? ""),
+        },
+      ],
+    };
+  });
+
+  return {
+    holdings,
+    source: liveCount ? "Live quotes" : "XTB snapshot",
+    status:
+      liveCount === input.holdings.length
+        ? ("live" as const)
+        : liveCount > 0
+          ? ("partial" as const)
+          : ("snapshot" as const),
   };
 }
 
@@ -277,7 +510,15 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
     return getPreviewWorkspaceData();
   }
 
-  const [{ data: holdingRows }, { data: transactionRows }] = await Promise.all([
+  const [
+    { data: holdingRows },
+    { data: transactionRows },
+    { data: snapshotRows },
+    { data: realizedRows },
+    { data: settingsRows },
+    { data: cashOverrideRows },
+    { data: marketRows },
+  ] = await Promise.all([
     base.supabase
       .from("holdings")
       .select("*")
@@ -291,20 +532,82 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
       .eq("portfolio_id", base.activePortfolio.id)
       .order("occurred_at", { ascending: false })
       .limit(50),
+    base.supabase
+      .from("broker_account_snapshots")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("snapshot_at", { ascending: false }),
+    base.supabase
+      .from("transactions")
+      .select("realized_pl")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .not("realized_pl", "is", null),
+    base.supabase
+      .from("market_data_settings")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .limit(1),
+    base.supabase
+      .from("broker_cash_overrides")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id),
+    base.supabase
+      .from("market_data_cache")
+      .select("*")
+      .eq("user_id", base.userId)
+      .in("data_type", ["quote", "fx"]),
   ]);
 
+  const marketDataSettings = mapMarketDataSettings(
+    (settingsRows?.[0] as Record<string, unknown> | undefined) ?? null
+  );
   const rawHoldings = (holdingRows ?? []).map((row) =>
     mapHolding(row as Record<string, unknown>)
   );
   const transactions = (transactionRows ?? []).map((row) =>
     mapTransaction(row as Record<string, unknown>)
   );
-  const summary = computePortfolioSummary(
-    rawHoldings,
-    transactions,
-    base.activePortfolio.baseCurrency
+  const visibleTransactions = transactions.filter(isVisibleActivity);
+  const valuation = applyLiveValuation({
+    holdings: rawHoldings,
+    marketRows: (marketRows ?? []) as Record<string, unknown>[],
+    baseCurrency: base.activePortfolio.baseCurrency,
+    settings: marketDataSettings,
+  });
+  const cashOverrides = (cashOverrideRows ?? []).map((row) =>
+    mapCashOverride(row as Record<string, unknown>)
   );
-  const holdings = enrichHoldings(rawHoldings, summary.totalValue);
+  const brokerCash = latestSnapshotCash(
+    (snapshotRows ?? []) as Record<string, unknown>[],
+    cashOverrides
+  );
+  const realizedPl =
+    realizedRows?.length
+      ? realizedRows.reduce(
+          (total, row) => total + numberFrom((row as Record<string, unknown>).realized_pl),
+          0
+        )
+      : null;
+  const summary = computePortfolioSummary(
+    valuation.holdings,
+    transactions,
+    base.activePortfolio.baseCurrency,
+    { cash: brokerCash, realizedPl }
+  );
+  summary.valuationMode = marketDataSettings.valuationMode;
+  summary.valuationSource = valuation.source;
+  summary.cashSource =
+    brokerCash === null
+      ? "Ledger fallback"
+      : cashOverrides.length
+        ? "Manual cash override + broker snapshot"
+        : "Broker cash snapshot";
+  summary.dataStatus = valuation.status;
+  const holdings = enrichHoldings(valuation.holdings, summary.totalValue);
 
   return {
     isPreview: base.isPreview,
@@ -314,9 +617,158 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
     activePortfolio: base.activePortfolio,
     brokerAccounts: base.brokerAccounts,
     holdings,
-    transactions,
+    transactions: visibleTransactions,
     summary,
+    marketDataSettings,
     accumulationCandidates: rankCandidates(holdings, "accumulation"),
     trimmingCandidates: rankCandidates(holdings, "trimming"),
+  };
+}
+
+export async function getStrategyData(): Promise<StrategyData> {
+  const base = await getWorkspaceBase();
+
+  if (base.isPreview || !base.supabase || !base.userId) {
+    const preview = getPreviewWorkspaceData();
+    return {
+      isPreview: preview.isPreview,
+      isLocked: preview.isLocked,
+      userEmail: preview.userEmail,
+      portfolios: preview.portfolios,
+      activePortfolio: preview.activePortfolio,
+      brokerAccounts: preview.brokerAccounts,
+      holdings: preview.holdings,
+    };
+  }
+
+  const { data: holdingRows } = await base.supabase
+    .from("holdings")
+    .select("*")
+    .eq("user_id", base.userId)
+    .eq("portfolio_id", base.activePortfolio.id)
+    .order("symbol", { ascending: true });
+
+  const summary = computePortfolioSummary(
+    (holdingRows ?? []).map((row) => mapHolding(row as Record<string, unknown>)),
+    [],
+    base.activePortfolio.baseCurrency
+  );
+
+  return {
+    isPreview: base.isPreview,
+    isLocked: base.isLocked,
+    userEmail: base.userEmail,
+    portfolios: base.portfolios,
+    activePortfolio: base.activePortfolio,
+    brokerAccounts: base.brokerAccounts,
+    holdings: enrichHoldings(
+      (holdingRows ?? []).map((row) => mapHolding(row as Record<string, unknown>)),
+      summary.totalValue
+    ),
+  };
+}
+
+export async function getSettingsData(): Promise<SettingsData> {
+  const base = await getWorkspaceBase();
+
+  if (base.isPreview || !base.supabase || !base.userId) {
+    const preview = getPreviewWorkspaceData();
+    return {
+      isPreview: preview.isPreview,
+      isLocked: preview.isLocked,
+      userEmail: preview.userEmail,
+      portfolios: preview.portfolios,
+      activePortfolio: preview.activePortfolio,
+      brokerAccounts: preview.brokerAccounts,
+      marketDataSettings: DEFAULT_MARKET_SETTINGS,
+      apiKeys: [],
+      cashOverrides: [],
+    };
+  }
+
+  const [{ data: settingsRows }, { data: keyRows }, { data: overrideRows }] =
+    await Promise.all([
+      base.supabase
+        .from("market_data_settings")
+        .select("*")
+        .eq("user_id", base.userId)
+        .eq("portfolio_id", base.activePortfolio.id)
+        .limit(1),
+      base.supabase
+        .from("market_data_api_keys")
+        .select("provider, enabled, key_last4, updated_at")
+        .eq("user_id", base.userId)
+        .order("provider", { ascending: true }),
+      base.supabase
+        .from("broker_cash_overrides")
+        .select("*")
+        .eq("user_id", base.userId)
+        .eq("portfolio_id", base.activePortfolio.id),
+    ]);
+
+  return {
+    isPreview: base.isPreview,
+    isLocked: base.isLocked,
+    userEmail: base.userEmail,
+    portfolios: base.portfolios,
+    activePortfolio: base.activePortfolio,
+    brokerAccounts: base.brokerAccounts,
+    marketDataSettings: mapMarketDataSettings(
+      (settingsRows?.[0] as Record<string, unknown> | undefined) ?? null
+    ),
+    apiKeys: (keyRows ?? []).map((row) =>
+      mapApiKey(row as Record<string, unknown>)
+    ),
+    cashOverrides: (overrideRows ?? []).map((row) =>
+      mapCashOverride(row as Record<string, unknown>)
+    ),
+  };
+}
+
+export async function getActivityData(): Promise<
+  Pick<
+    WorkspaceData,
+    | "isPreview"
+    | "isLocked"
+    | "userEmail"
+    | "portfolios"
+    | "activePortfolio"
+    | "brokerAccounts"
+    | "transactions"
+  >
+> {
+  const base = await getWorkspaceBase();
+
+  if (base.isPreview || !base.supabase || !base.userId) {
+    const preview = getPreviewWorkspaceData();
+    return {
+      isPreview: preview.isPreview,
+      isLocked: preview.isLocked,
+      userEmail: preview.userEmail,
+      portfolios: preview.portfolios,
+      activePortfolio: preview.activePortfolio,
+      brokerAccounts: preview.brokerAccounts,
+      transactions: preview.transactions,
+    };
+  }
+
+  const { data: transactionRows } = await base.supabase
+    .from("transactions")
+    .select("*")
+    .eq("user_id", base.userId)
+    .eq("portfolio_id", base.activePortfolio.id)
+    .order("occurred_at", { ascending: false })
+    .limit(250);
+
+  return {
+    isPreview: base.isPreview,
+    isLocked: base.isLocked,
+    userEmail: base.userEmail,
+    portfolios: base.portfolios,
+    activePortfolio: base.activePortfolio,
+    brokerAccounts: base.brokerAccounts,
+    transactions: (transactionRows ?? [])
+      .map((row) => mapTransaction(row as Record<string, unknown>))
+      .filter(isVisibleActivity),
   };
 }
