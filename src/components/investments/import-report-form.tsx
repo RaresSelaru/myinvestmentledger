@@ -27,6 +27,9 @@ type ImportReportFormProps = {
   stagedImportId?: string | null;
   result?: {
     message?: string | null;
+    newRows?: string | null;
+    duplicates?: string | null;
+    updated?: string | null;
     parsed?: string | null;
     lots?: string | null;
     cash?: string | null;
@@ -130,6 +133,20 @@ export function ImportReportForm({
                       {result.parsed} rows · {result.lots ?? "0"} lots · {result.cash ?? "0"} cash rows · {result.transactions ?? "0"} ledger rows
                     </p>
                   ) : null}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {!hasStagedImport && result?.message ? (
+            <div className="rounded-xl border border-primary/20 bg-primary/10 p-4 text-sm">
+              <div className="flex items-start gap-3">
+                <FileSpreadsheet className="mt-0.5 size-4 text-primary" aria-hidden="true" />
+                <div>
+                  <p className="font-medium">{result.message}</p>
+                  <p className="mt-2 metric-tabular text-xs text-muted-foreground">
+                    {result.newRows ?? "0"} new · {result.duplicates ?? "0"} duplicates · {result.updated ?? "0"} corrected
+                  </p>
                 </div>
               </div>
             </div>

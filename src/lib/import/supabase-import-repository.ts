@@ -13,6 +13,7 @@ import type {
 import type {
   ImportFileInput,
   ImportRepository,
+  ImportRestorePoint,
   ImportResult,
   NormalizedWriteInput,
   RawRowWriteInput,
@@ -38,6 +39,72 @@ function dbImportStatus(status: ImportResult["stats"]["status"]) {
   if (status === "completed") return "succeeded";
   if (status === "dry_run") return "pending";
   return status;
+}
+
+async function selectInChunks(
+  supabase: SupabaseClient,
+  table: string,
+  input: {
+    userId: string;
+    brokerAccountId: string;
+    sourceFingerprints: string[];
+  }
+) {
+  const rows: Record<string, unknown>[] = [];
+  const fingerprints = input.sourceFingerprints.filter(Boolean);
+
+  for (let index = 0; index < fingerprints.length; index += 200) {
+    const chunk = fingerprints.slice(index, index + 200);
+    const { data, error } = await supabase
+      .from(table)
+      .select("*")
+      .eq("user_id", input.userId)
+      .eq("broker_account_id", input.brokerAccountId)
+      .in("source_fingerprint", chunk);
+
+    if (error) throw error;
+    rows.push(...((data ?? []) as Record<string, unknown>[]));
+  }
+
+  return rows;
+}
+
+async function deleteInChunks(
+  supabase: SupabaseClient,
+  table: string,
+  input: {
+    userId: string;
+    brokerAccountId: string;
+    sourceFingerprints: string[];
+  }
+) {
+  const fingerprints = input.sourceFingerprints.filter(Boolean);
+
+  for (let index = 0; index < fingerprints.length; index += 200) {
+    const chunk = fingerprints.slice(index, index + 200);
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq("user_id", input.userId)
+      .eq("broker_account_id", input.brokerAccountId)
+      .in("source_fingerprint", chunk);
+
+    if (error) throw error;
+  }
+}
+
+async function restoreRows(
+  supabase: SupabaseClient,
+  table: string,
+  rows: Record<string, unknown>[]
+) {
+  if (!rows.length) return;
+
+  for (let index = 0; index < rows.length; index += 200) {
+    const chunk = rows.slice(index, index + 200);
+    const { error } = await supabase.from(table).upsert(chunk);
+    if (error) throw error;
+  }
 }
 
 function mapPositionLot(row: Record<string, unknown>): PositionLot {
@@ -118,6 +185,105 @@ function mapTarget(row: Record<string, unknown>): TargetConfig {
 
 export class SupabaseImportRepository implements ImportRepository {
   constructor(private supabase: SupabaseClient) {}
+
+  async createImportRestorePoint(input: {
+    userId: string;
+    portfolioId: string;
+    brokerAccountId: string;
+    fileHash: string;
+    sourceFingerprints: string[];
+  }): Promise<ImportRestorePoint> {
+    const [
+      { data: importedFile, error: importedFileError },
+      rawRows,
+      transactions,
+      positionLots,
+      cashOperations,
+      { data: holdings, error: holdingsError },
+    ] = await Promise.all([
+      this.supabase
+        .from("imported_files")
+        .select("*")
+        .eq("user_id", input.userId)
+        .eq("broker_account_id", input.brokerAccountId)
+        .eq("file_hash", input.fileHash)
+        .maybeSingle(),
+      selectInChunks(this.supabase, "raw_import_rows", input),
+      selectInChunks(this.supabase, "transactions", input),
+      selectInChunks(this.supabase, "position_lots", input),
+      selectInChunks(this.supabase, "cash_operations", input),
+      this.supabase
+        .from("holdings")
+        .select("*")
+        .eq("user_id", input.userId)
+        .eq("portfolio_id", input.portfolioId),
+    ]);
+
+    if (importedFileError) throw importedFileError;
+    if (holdingsError) throw holdingsError;
+
+    return {
+      importedFile: importedFile
+        ? (importedFile as Record<string, unknown>)
+        : null,
+      rawRows,
+      transactions,
+      positionLots,
+      cashOperations,
+      holdings: (holdings ?? []) as Record<string, unknown>[],
+    };
+  }
+
+  async rollbackImport(input: {
+    userId: string;
+    portfolioId: string;
+    brokerAccountId: string;
+    importedFileId: string;
+    sourceFingerprints: string[];
+    restorePoint: ImportRestorePoint;
+  }) {
+    const base = {
+      userId: input.userId,
+      brokerAccountId: input.brokerAccountId,
+      sourceFingerprints: input.sourceFingerprints,
+    };
+
+    await deleteInChunks(this.supabase, "transactions", base);
+    await deleteInChunks(this.supabase, "position_lots", base);
+    await deleteInChunks(this.supabase, "cash_operations", base);
+    await deleteInChunks(this.supabase, "raw_import_rows", base);
+
+    await this.supabase
+      .from("holdings_snapshot")
+      .delete()
+      .eq("user_id", input.userId)
+      .eq("portfolio_id", input.portfolioId)
+      .eq("imported_file_id", input.importedFileId);
+
+    await this.supabase
+      .from("holdings")
+      .delete()
+      .eq("user_id", input.userId)
+      .eq("portfolio_id", input.portfolioId);
+
+    await restoreRows(this.supabase, "raw_import_rows", input.restorePoint.rawRows);
+    await restoreRows(this.supabase, "transactions", input.restorePoint.transactions);
+    await restoreRows(this.supabase, "position_lots", input.restorePoint.positionLots);
+    await restoreRows(this.supabase, "cash_operations", input.restorePoint.cashOperations);
+    await restoreRows(this.supabase, "holdings", input.restorePoint.holdings);
+
+    if (input.restorePoint.importedFile) {
+      await restoreRows(this.supabase, "imported_files", [
+        input.restorePoint.importedFile,
+      ]);
+    } else {
+      await this.supabase
+        .from("imported_files")
+        .delete()
+        .eq("id", input.importedFileId)
+        .eq("user_id", input.userId);
+    }
+  }
 
   async upsertImportedFile(
     input: ImportFileInput,

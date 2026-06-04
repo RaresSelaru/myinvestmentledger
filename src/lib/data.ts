@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { computePortfolioSummary, enrichHoldings, rankCandidates } from "@/lib/finance";
 import { getPreviewWorkspaceData } from "@/lib/mock-data";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -15,22 +16,10 @@ type SupabaseClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServer
 
 const ACTIVE_PORTFOLIO_COOKIE = "mil_active_portfolio_id";
 
-async function ensureDefaultWorkspace(
+async function createDefaultWorkspace(
   supabase: SupabaseClient,
   user: { id: string; email?: string }
 ) {
-  const { data: existingPortfolio } = await supabase
-    .from("portfolios")
-    .select("id")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (existingPortfolio?.id) {
-    return existingPortfolio.id as string;
-  }
-
   await supabase.from("profiles").upsert({
     user_id: user.id,
     email: user.email ?? null,
@@ -163,7 +152,7 @@ function previewShell(): WorkspaceShellData {
   };
 }
 
-async function getWorkspaceBase(): Promise<{
+const getWorkspaceBase = cache(async (): Promise<{
   supabase: SupabaseClient | null;
   userId: string | null;
   userEmail: string;
@@ -172,7 +161,7 @@ async function getWorkspaceBase(): Promise<{
   portfolios: Portfolio[];
   activePortfolio: Portfolio;
   brokerAccounts: BrokerAccount[];
-}> {
+}> => {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
@@ -181,24 +170,34 @@ async function getWorkspaceBase(): Promise<{
   }
 
   const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    data: { session },
+  } = await supabase.auth.getSession();
+  const user = session?.user;
 
   if (!user) {
     const preview = getPreviewWorkspaceData();
     return { ...preview, supabase: null, userId: null };
   }
 
-  await ensureDefaultWorkspace(supabase, {
-    id: user.id,
-    email: user.email ?? undefined,
-  });
-
-  const { data: portfolioRows } = await supabase
+  let { data: portfolioRows } = await supabase
     .from("portfolios")
     .select("*")
     .eq("user_id", user.id)
     .order("created_at", { ascending: true });
+
+  if (!portfolioRows?.length) {
+    await createDefaultWorkspace(supabase, {
+      id: user.id,
+      email: user.email ?? undefined,
+    });
+
+    const refreshed = await supabase
+      .from("portfolios")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: true });
+    portfolioRows = refreshed.data;
+  }
 
   const portfolios = (portfolioRows ?? []).map((row) =>
     mapPortfolio(row as Record<string, unknown>)
@@ -252,7 +251,7 @@ async function getWorkspaceBase(): Promise<{
       mapBrokerAccount(row as Record<string, unknown>)
     ),
   };
-}
+});
 
 export async function getWorkspaceShellData(): Promise<WorkspaceShellData> {
   const base = await getWorkspaceBase();

@@ -30,7 +30,9 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  // Keep token refresh cheap on route transitions. Server actions still use
+  // getUser() for strict mutation checks, while data reads remain protected by RLS.
+  await supabase.auth.getSession();
 
   return response;
 }

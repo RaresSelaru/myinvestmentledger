@@ -41,6 +41,22 @@ export type ImportResult = {
 
 export type ImportRepository = {
   upsertImportedFile(input: ImportFileInput, stats: ImportResult["stats"]): Promise<string>;
+  createImportRestorePoint?(input: {
+    userId: string;
+    portfolioId: string;
+    brokerAccountId: string;
+    fileHash: string;
+    sourceFingerprints: string[];
+  }): Promise<ImportRestorePoint>;
+  rollbackImport?(input: {
+    userId: string;
+    portfolioId: string;
+    brokerAccountId: string;
+    importedFileId: string;
+    fileHash: string;
+    sourceFingerprints: string[];
+    restorePoint: ImportRestorePoint;
+  }): Promise<void>;
   findRawRow(input: {
     userId: string;
     brokerAccountId: string;
@@ -57,6 +73,15 @@ export type ImportRepository = {
     brokerAccountId: string;
     importedFileId: string;
   }): Promise<void>;
+};
+
+export type ImportRestorePoint = {
+  importedFile: Record<string, unknown> | null;
+  rawRows: Record<string, unknown>[];
+  transactions: Record<string, unknown>[];
+  positionLots: Record<string, unknown>[];
+  cashOperations: Record<string, unknown>[];
+  holdings: Record<string, unknown>[];
 };
 
 export type RawRowWriteInput = {
@@ -150,12 +175,26 @@ export async function commitXtbImport({
     correctedRows: 0,
     status: "processing",
   };
-  const importedFileId = await repository.upsertImportedFile(
-    { ...file, meta: parsed.meta },
-    stats
-  );
+  const sourceFingerprints = [
+    ...new Set(parsed.rows.map((row) => row.sourceFingerprint)),
+  ];
+  const restorePoint = repository.createImportRestorePoint
+    ? await repository.createImportRestorePoint({
+        userId: file.userId,
+        portfolioId: file.portfolioId,
+        brokerAccountId: file.brokerAccountId,
+        fileHash: file.fileHash,
+        sourceFingerprints,
+      })
+    : null;
+  let importedFileId = file.id;
 
   try {
+    importedFileId = await repository.upsertImportedFile(
+      { ...file, meta: parsed.meta },
+      stats
+    );
+
     for (const row of parsed.rows) {
       const existing = await repository.findRawRow({
         userId: file.userId,
@@ -213,7 +252,26 @@ export async function commitXtbImport({
   } catch (error) {
     stats.status = "failed";
     stats.error = error instanceof Error ? error.message : "Import failed";
-    await repository.upsertImportedFile({ ...file, id: importedFileId, meta: parsed.meta }, stats);
+
+    if (restorePoint && repository.rollbackImport) {
+      await repository.rollbackImport({
+        userId: file.userId,
+        portfolioId: file.portfolioId,
+        brokerAccountId: file.brokerAccountId,
+        importedFileId,
+        fileHash: file.fileHash,
+        sourceFingerprints,
+        restorePoint,
+      });
+    }
+
+    if (!restorePoint?.importedFile || restorePoint.importedFile.status === "failed") {
+      await repository.upsertImportedFile(
+        { ...file, id: importedFileId, meta: parsed.meta },
+        stats
+      );
+    }
+
     throw error;
   }
 

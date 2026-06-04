@@ -7,6 +7,7 @@ import {
   dryRunXtbImport,
   type ImportFileInput,
   type ImportRepository,
+  type ImportRestorePoint,
   type NormalizedWriteInput,
   type RawRowWriteInput,
   type StoredRawRow,
@@ -20,11 +21,14 @@ const fixturePath = path.join(
 
 class MemoryImportRepository implements ImportRepository {
   importedFiles = new Map<string, string>();
+  importedFileRows = new Map<string, Record<string, unknown>>();
   rawRows = new Map<string, StoredRawRow>();
   transactions = new Map<string, Transaction>();
   lots = new Map<string, PositionLot>();
   cash = new Map<string, CashOperation>();
   recomputeCalls = 0;
+  failAfterTransactionWrites: number | null = null;
+  transactionWrites = 0;
 
   async upsertImportedFile(input: ImportFileInput) {
     const key = `${input.userId}:${input.brokerAccountId}:${input.fileHash}`;
@@ -33,7 +37,84 @@ class MemoryImportRepository implements ImportRepository {
     if (existing) return existing;
 
     this.importedFiles.set(key, input.id);
+    this.importedFileRows.set(key, { ...input });
     return input.id;
+  }
+
+  async createImportRestorePoint(input: {
+    userId: string;
+    portfolioId: string;
+    brokerAccountId: string;
+    fileHash: string;
+    sourceFingerprints: string[];
+  }): Promise<ImportRestorePoint> {
+    const key = `${input.userId}:${input.brokerAccountId}:${input.fileHash}`;
+    const fingerprints = new Set(input.sourceFingerprints);
+
+    const rawRows: Record<string, unknown>[] = [];
+    for (const fingerprint of fingerprints) {
+      const rowKey = `${input.userId}:${input.brokerAccountId}:${fingerprint}`;
+      const row = this.rawRows.get(rowKey);
+      if (row) {
+        rawRows.push({ rowKey, row });
+      }
+    }
+
+    return {
+      importedFile: this.importedFileRows.get(key) ?? null,
+      rawRows,
+      transactions: [...this.transactions.entries()]
+        .filter(([fingerprint]) => fingerprints.has(fingerprint))
+        .map(([fingerprint, value]) => ({ fingerprint, value })),
+      positionLots: [...this.lots.entries()]
+        .filter(([fingerprint]) => fingerprints.has(fingerprint))
+        .map(([fingerprint, value]) => ({ fingerprint, value })),
+      cashOperations: [...this.cash.entries()]
+        .filter(([fingerprint]) => fingerprints.has(fingerprint))
+        .map(([fingerprint, value]) => ({ fingerprint, value })),
+      holdings: [],
+    };
+  }
+
+  async rollbackImport(input: {
+    userId: string;
+    brokerAccountId: string;
+    fileHash: string;
+    sourceFingerprints: string[];
+    restorePoint: ImportRestorePoint;
+  }) {
+    const fingerprints = new Set(input.sourceFingerprints);
+
+    for (const fingerprint of fingerprints) {
+      this.rawRows.delete(`${input.userId}:${input.brokerAccountId}:${fingerprint}`);
+    }
+    for (const fingerprint of fingerprints) {
+      this.transactions.delete(fingerprint);
+      this.lots.delete(fingerprint);
+      this.cash.delete(fingerprint);
+    }
+
+    for (const item of input.restorePoint.rawRows) {
+      this.rawRows.set(String(item.rowKey), item.row as StoredRawRow);
+    }
+    for (const item of input.restorePoint.transactions) {
+      this.transactions.set(String(item.fingerprint), item.value as Transaction);
+    }
+    for (const item of input.restorePoint.positionLots) {
+      this.lots.set(String(item.fingerprint), item.value as PositionLot);
+    }
+    for (const item of input.restorePoint.cashOperations) {
+      this.cash.set(String(item.fingerprint), item.value as CashOperation);
+    }
+
+    const fileKey = `${input.userId}:${input.brokerAccountId}:${input.fileHash}`;
+    if (input.restorePoint.importedFile) {
+      this.importedFileRows.set(fileKey, input.restorePoint.importedFile);
+      this.importedFiles.set(fileKey, String(input.restorePoint.importedFile.id));
+    } else {
+      this.importedFileRows.delete(fileKey);
+      this.importedFiles.delete(fileKey);
+    }
   }
 
   async findRawRow(input: {
@@ -71,6 +152,14 @@ class MemoryImportRepository implements ImportRepository {
   }
 
   async upsertTransaction(input: NormalizedWriteInput<Transaction>) {
+    this.transactionWrites += 1;
+    if (
+      this.failAfterTransactionWrites !== null &&
+      this.transactionWrites > this.failAfterTransactionWrites
+    ) {
+      throw new Error("Simulated import failure");
+    }
+
     this.transactions.set(input.row.sourceFingerprint, {
       ...input.value,
       id: input.row.sourceFingerprint,
@@ -244,5 +333,25 @@ describe("XTB import engine", () => {
 
     expect(corrected.stats.correctedRows).toBe(1);
     expect(corrected.stats.newRows).toBe(0);
+  });
+
+  it("rolls back partial writes when a committed import fails", async () => {
+    const buffer = fs.readFileSync(fixturePath);
+    const repository = new MemoryImportRepository();
+    repository.failAfterTransactionWrites = 10;
+
+    await expect(
+      commitXtbImport({
+        buffer,
+        file: importFile("rollback"),
+        repository,
+      })
+    ).rejects.toThrow("Simulated import failure");
+
+    expect(repository.rawRows.size).toBe(0);
+    expect(repository.transactions.size).toBe(0);
+    expect(repository.cash.size).toBe(0);
+    expect(repository.lots.size).toBe(0);
+    expect(repository.recomputeCalls).toBe(0);
   });
 });
