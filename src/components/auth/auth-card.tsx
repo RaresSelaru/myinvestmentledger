@@ -13,8 +13,8 @@ export function AuthCard({
   children: ReactNode;
 }) {
   return (
-    <Card className="border-border/70 bg-card/95 shadow-2xl shadow-black/20">
-      <CardHeader className="space-y-6">
+    <Card className="border-border/70 bg-card shadow-[0_24px_70px_rgba(15,35,34,0.12)]">
+      <CardHeader className="space-y-8 p-7">
         <Link href="/dashboard" className="flex items-center gap-3">
           <BrandMark className="size-10" />
           <span className="text-sm font-semibold tracking-tight">
@@ -22,13 +22,13 @@ export function AuthCard({
           </span>
         </Link>
         <div className="space-y-2">
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
           {subtitle ? (
             <p className="text-sm leading-6 text-muted-foreground">{subtitle}</p>
           ) : null}
         </div>
       </CardHeader>
-      <CardContent>{children}</CardContent>
+      <CardContent className="px-7 pb-7">{children}</CardContent>
     </Card>
   );
 }

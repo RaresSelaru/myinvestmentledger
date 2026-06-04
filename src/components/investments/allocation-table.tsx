@@ -30,11 +30,11 @@ export function AllocationTable({
   const [expanded, setExpanded] = useState<string | null>(holdings[0]?.symbol ?? null);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border/70 bg-card/90 shadow-lg shadow-black/10">
+    <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-[0_18px_55px_rgba(15,35,34,0.08)]">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-              <TableRow className="bg-muted/35">
+              <TableRow className="bg-muted/35 hover:bg-muted/35">
               <TableHead className="w-10" />
               <TableHead>Symbol</TableHead>
               <TableHead>Company</TableHead>
@@ -55,7 +55,7 @@ export function AllocationTable({
 
               return (
                 <Fragment key={holding.symbol}>
-                  <TableRow key={holding.symbol} className="hover:bg-muted/35">
+                  <TableRow key={holding.symbol}>
                     <TableCell>
                       <Button
                         variant="ghost"
@@ -118,8 +118,8 @@ export function AllocationTable({
                   </TableRow>
                   {isOpen ? (
                     <TableRow key={`${holding.symbol}-details`}>
-                      <TableCell colSpan={9} className="bg-muted/20 p-0">
-                        <div className="grid gap-6 p-5 lg:grid-cols-[1.1fr_1fr_1fr]">
+                      <TableCell colSpan={9} className="bg-muted/25 p-0">
+                        <div className="grid gap-6 p-6 lg:grid-cols-[1.1fr_1fr_1fr]">
                           <div className="grid grid-cols-2 gap-4 text-sm">
                             <Detail label="Quantity" value={formatNumber(holding.quantity, 4)} />
                             <Detail
@@ -144,7 +144,7 @@ export function AllocationTable({
                             />
                           </div>
                           <div className="space-y-3 text-sm">
-                            <p className="font-medium">Targets</p>
+                            <p className="font-semibold">Targets</p>
                             <Detail
                               label="Target buy"
                               value={
@@ -180,7 +180,7 @@ export function AllocationTable({
                             ))}
                           </div>
                           <div className="space-y-3 text-sm">
-                            <p className="font-medium">Latest transactions</p>
+                            <p className="font-semibold">Latest transactions</p>
                             {recent.length ? (
                               <div className="space-y-2">
                                 {recent.map((transaction) => (
@@ -215,7 +215,7 @@ export function AllocationTable({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 rounded-2xl bg-white/70 p-3 ring-1 ring-border/60">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="metric-tabular font-medium">{value}</p>
     </div>

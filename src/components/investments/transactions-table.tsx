@@ -111,7 +111,7 @@ export function TransactionsTable({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-card/90 p-3 shadow-lg shadow-black/10 sm:flex-row">
+      <div className="flex flex-col gap-3 rounded-3xl border border-border/70 bg-white p-3 shadow-[0_14px_45px_rgba(15,35,34,0.06)] sm:flex-row">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -136,11 +136,11 @@ export function TransactionsTable({
         </Select>
       </div>
 
-      <div className="overflow-hidden rounded-2xl border border-border/70 bg-card/90 shadow-lg shadow-black/10">
+      <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-[0_18px_55px_rgba(15,35,34,0.08)]">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/35">
+              <TableRow className="bg-muted/35 hover:bg-muted/35">
                 <TableHead>Date</TableHead>
                 <TableHead>Event</TableHead>
                 <TableHead>Symbol</TableHead>
@@ -185,9 +185,9 @@ export function TransactionsTable({
                           className={cn(
                             "text-right metric-tabular",
                             transaction.amount < 0
-                              ? "text-rose-300"
+                              ? "text-rose-700"
                               : transaction.amount > 0
-                                ? "text-emerald-300"
+                                ? "text-emerald-700"
                                 : ""
                           )}
                         >
@@ -198,7 +198,7 @@ export function TransactionsTable({
                             variant={
                               transaction.source === "manual" ? "outline" : "secondary"
                             }
-                            className="rounded-md font-normal"
+                            className="rounded-full font-normal"
                           >
                             {transaction.source === "manual" ? "Manual" : "XTB import"}
                           </Badge>
@@ -214,7 +214,7 @@ export function TransactionsTable({
                       </TableRow>
                       {expanded ? (
                         <TableRow key={`${transaction.id}-details`}>
-                          <TableCell colSpan={7} className="bg-background/35">
+                          <TableCell colSpan={7} className="bg-muted/25">
                             <div className="grid gap-3 text-sm md:grid-cols-3">
                               <TraceItem
                                 label="Broker account"
@@ -259,7 +259,7 @@ export function TransactionsTable({
 
 function TraceItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-xl border border-border/60 bg-card/70 p-3">
+    <div className="min-w-0 rounded-2xl border border-border/60 bg-white/75 p-3">
       <p className="text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>

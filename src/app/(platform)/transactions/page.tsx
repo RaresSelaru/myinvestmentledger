@@ -31,12 +31,12 @@ export default async function TransactionsPage({
         }
       />
       {first(params.error) ? (
-        <p className="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+        <p className="rounded-3xl border border-destructive/25 bg-destructive/5 px-5 py-4 text-sm text-destructive">
           {first(params.error)}
         </p>
       ) : null}
       {first(params.message) ? (
-        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+        <p className="rounded-3xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-sm text-emerald-800">
           {first(params.message)}
         </p>
       ) : null}

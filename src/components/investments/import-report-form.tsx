@@ -55,10 +55,10 @@ export function ImportReportForm({
 
   if (isLocked) {
     return (
-      <Card className="max-w-3xl border-primary/20 bg-card/80">
-        <CardContent className="flex flex-col gap-5 p-6 sm:flex-row sm:items-center sm:justify-between">
+      <Card className="max-w-4xl border-primary/20 bg-white">
+        <CardContent className="flex flex-col gap-5 p-7 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
-            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+            <span className="soft-green-icon size-12">
               <LockKeyhole className="size-5" aria-hidden="true" />
             </span>
             <div>
@@ -78,21 +78,23 @@ export function ImportReportForm({
   }
 
   return (
-    <Card className="max-w-3xl border-border/70 bg-card/90 shadow-xl shadow-black/10">
+    <Card className="max-w-5xl">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <FileSpreadsheet className="size-4 text-primary" aria-hidden="true" />
+        <CardTitle className="flex items-center gap-3 text-xl">
+          <span className="soft-green-icon size-10">
+            <FileSpreadsheet className="size-5" aria-hidden="true" />
+          </span>
           XTB report
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <form action={commitAction} className="space-y-5">
+        <form action={commitAction} className="space-y-6">
           <input type="hidden" name="portfolioId" value={portfolio.id} />
           {stagedImportId ? (
             <input type="hidden" name="stagedImportId" value={stagedImportId} />
           ) : null}
 
-          <div className="grid gap-4 sm:grid-cols-[minmax(0,260px)_1fr]">
+          <div className="grid gap-5 sm:grid-cols-[minmax(0,300px)_1fr]">
             <div className="space-y-2">
               <Label>Broker account</Label>
               <Select name="brokerAccountId" defaultValue={defaultBrokerAccount}>
@@ -121,7 +123,7 @@ export function ImportReportForm({
           </div>
 
           {hasStagedImport ? (
-            <div className="rounded-xl border border-primary/20 bg-primary/10 p-4 text-sm">
+            <div className="rounded-3xl border border-primary/20 bg-primary/10 p-5 text-sm">
               <div className="flex items-start gap-3">
                 <FileSpreadsheet className="mt-0.5 size-4 text-primary" aria-hidden="true" />
                 <div>
@@ -145,7 +147,7 @@ export function ImportReportForm({
           ) : null}
 
           {!hasStagedImport && result?.message ? (
-            <div className="rounded-xl border border-primary/20 bg-primary/10 p-4 text-sm">
+            <div className="rounded-3xl border border-primary/20 bg-primary/10 p-5 text-sm">
               <div className="flex items-start gap-3">
                 <FileSpreadsheet className="mt-0.5 size-4 text-primary" aria-hidden="true" />
                 <div>
@@ -158,7 +160,7 @@ export function ImportReportForm({
             </div>
           ) : null}
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-3 pt-1">
             <ImportButton
               action={dryRunAction}
               intent={intent}

@@ -7,12 +7,12 @@ export default function PlatformLoading() {
         <Skeleton className="h-9 w-56" />
         <Skeleton className="h-5 w-96 max-w-full" />
       </div>
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {Array.from({ length: 5 }).map((_, index) => (
-          <Skeleton key={index} className="h-32 rounded-2xl" />
+          <Skeleton key={index} className="h-40 rounded-3xl" />
         ))}
       </section>
-      <Skeleton className="h-[420px] rounded-2xl" />
+      <Skeleton className="h-[420px] rounded-3xl" />
     </div>
   );
 }

@@ -33,23 +33,23 @@ export default async function StrategyPage({ searchParams }: StrategyPageProps) 
       />
 
       {first(params.error) ? (
-        <p className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <p className="rounded-3xl border border-destructive/25 bg-destructive/10 px-5 py-4 text-sm text-destructive">
           {first(params.error)}
         </p>
       ) : null}
       {first(params.message) ? (
-        <p className="rounded-xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm text-primary">
+        <p className="rounded-3xl border border-primary/25 bg-primary/10 px-5 py-4 text-sm text-primary">
           {first(params.message)}
         </p>
       ) : null}
 
-      <section className="grid gap-3 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-3">
         <MiniStat label="Symbols" value={String(workspace.holdings.length)} />
         <MiniStat label="Target total" value={formatPercent(targetTotal)} />
         <MiniStat label="Average core" value={formatPercent(coreTotal)} />
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.6fr_0.8fr]">
+      <section className="grid gap-5 xl:grid-cols-[1.6fr_0.8fr]">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Target allocation</CardTitle>
@@ -69,7 +69,7 @@ export default async function StrategyPage({ searchParams }: StrategyPageProps) 
               <CardTitle className="text-base">Portfolio</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-2xl border border-border/70 bg-background/35 p-4">
+              <div className="rounded-3xl border border-border/70 bg-white p-5 shadow-sm">
                 <p className="font-semibold">{workspace.activePortfolio.name}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Base currency: {workspace.activePortfolio.baseCurrency}
@@ -80,7 +80,7 @@ export default async function StrategyPage({ searchParams }: StrategyPageProps) 
                   </p>
                 ) : null}
               </div>
-              <div className="rounded-2xl border border-border/70 bg-background/35 p-4 text-sm text-muted-foreground">
+              <div className="rounded-3xl border border-border/70 bg-muted/35 p-5 text-sm text-muted-foreground">
                 Technical configuration, live prices, API keys, and cash overrides live in Settings.
               </div>
             </CardContent>
@@ -92,7 +92,7 @@ export default async function StrategyPage({ searchParams }: StrategyPageProps) 
             </CardHeader>
             <CardContent className="space-y-3">
               {workspace.brokerAccounts.map((account) => (
-                <div key={account.id} className="rounded-md border p-3 text-sm">
+                <div key={account.id} className="rounded-2xl border border-border/70 bg-white p-4 text-sm shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-medium">{account.name}</p>
                     <span className="metric-tabular text-muted-foreground">

@@ -46,7 +46,7 @@ export function PortfolioSelector({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="h-11 min-w-0 justify-between gap-3 rounded-2xl bg-card/80 px-3 sm:min-w-72"
+          className="h-14 min-w-0 justify-between gap-4 rounded-2xl bg-white px-4 shadow-[0_10px_28px_rgba(15,35,34,0.06)] sm:min-w-72"
         >
           <span className="min-w-0 text-left">
             <span className="block truncate font-medium">
@@ -60,13 +60,13 @@ export function PortfolioSelector({
           <ChevronsUpDown className="size-4 text-muted-foreground" aria-hidden="true" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-[min(92vw,380px)] p-3">
+      <PopoverContent align="start" className="w-[min(92vw,390px)] p-4">
         <PopoverHeader>
           <PopoverTitle>Portfolios</PopoverTitle>
         </PopoverHeader>
 
         {isLocked ? (
-          <div className="rounded-xl border border-primary/20 bg-primary/10 p-3 text-sm">
+          <div className="rounded-2xl border border-primary/20 bg-primary/10 p-4 text-sm">
             <p className="font-medium">Preview mode</p>
             <p className="mt-1 text-muted-foreground">
               Log in to create and switch real portfolios.
@@ -85,8 +85,8 @@ export function PortfolioSelector({
                   <button
                     type="submit"
                     className={cn(
-                      "flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2 text-left text-sm transition-colors hover:bg-muted",
-                      portfolio.id === activePortfolio.id && "bg-primary/10 text-primary"
+                      "flex w-full items-center justify-between gap-3 rounded-2xl px-3.5 py-3 text-left text-sm transition-colors hover:bg-accent/55",
+                      portfolio.id === activePortfolio.id && "bg-accent/70 text-foreground"
                     )}
                   >
                     <span className="min-w-0">
@@ -132,7 +132,7 @@ export function PortfolioSelector({
                     </Select>
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 pt-1">
                   <Button type="submit" size="sm">
                     Create
                   </Button>

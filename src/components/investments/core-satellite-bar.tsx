@@ -16,11 +16,11 @@ export function CoreSatelliteBar({
     <div className={cn("space-y-1.5", className)}>
       <div className="flex h-2 overflow-hidden rounded-full bg-muted">
         <div
-          className="bg-[oklch(0.58_0.12_255)]"
+          className="bg-primary"
           style={{ width: `${safeCore}%` }}
         />
         <div
-          className="bg-[oklch(0.65_0.12_190)]"
+          className="bg-[oklch(0.78_0.1_153)]"
           style={{ width: `${safeSatellite}%` }}
         />
       </div>

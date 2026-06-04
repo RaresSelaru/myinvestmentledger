@@ -58,7 +58,7 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
             Portfolio
           </Link>
         </Button>
-        <Card className="border-primary/20 bg-card/90">
+        <Card className="border-primary/20 bg-card">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-14 text-center">
             <div>
               <p className="text-2xl font-semibold tracking-tight">{holding.symbol}</p>
@@ -89,7 +89,7 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
         description={holding.companyName ?? "Position detail"}
       />
 
-      <section className="grid gap-3 lg:grid-cols-4">
+      <section className="grid gap-4 lg:grid-cols-4">
         <Metric label="Market value" value={formatCurrency(holding.marketValue, workspace.summary.currency)} />
         <Metric label="Quantity" value={formatNumber(holding.quantity, 4)} />
         <Metric
@@ -102,7 +102,7 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
         />
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-[1fr_1fr]">
+      <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Allocation</CardTitle>
@@ -180,7 +180,7 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
         </Card>
       </section>
 
-      <section className="grid gap-3 lg:grid-cols-[1fr_1fr]">
+      <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Notes</CardTitle>
@@ -216,7 +216,7 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
             transactions.map((transaction) => (
               <div
                 key={transaction.id}
-                className="flex items-center justify-between gap-4 rounded-md border px-3 py-2 text-sm"
+                className="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-white px-4 py-3 text-sm shadow-sm"
               >
                 <span>{transaction.date}</span>
                 <span className="text-muted-foreground">
@@ -246,7 +246,7 @@ function Metric({
   value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-md border bg-card p-3">
+    <div className="rounded-2xl border border-border/70 bg-white p-4 shadow-sm">
       <p className="text-xs text-muted-foreground">{label}</p>
       <div className="mt-1 metric-tabular font-medium">{value}</div>
     </div>

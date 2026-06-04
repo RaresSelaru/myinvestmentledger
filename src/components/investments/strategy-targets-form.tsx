@@ -92,7 +92,7 @@ export function StrategyTargetsForm({
 
   if (!holdings.length) {
     return (
-      <p className="rounded-2xl border border-dashed border-border/80 px-4 py-10 text-center text-sm text-muted-foreground">
+      <p className="rounded-3xl border border-dashed border-primary/25 bg-white px-4 py-12 text-center text-sm text-muted-foreground">
         Import an XTB report first, then tune targets and core/satellite splits here.
       </p>
     );
@@ -103,7 +103,7 @@ export function StrategyTargetsForm({
       <input type="hidden" name="portfolioId" value={portfolioId} />
       <input type="hidden" name="targetsJson" value={payload} />
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-border/70 bg-background/35 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-border/70 bg-muted/35 p-4">
         <div>
           <p className="text-sm font-medium">Allocation plan</p>
           <p className="text-xs text-muted-foreground">
@@ -111,7 +111,7 @@ export function StrategyTargetsForm({
             <span
               className={cn(
                 "metric-tabular font-semibold",
-                totalTarget > 100 ? "text-rose-300" : "text-emerald-300"
+                totalTarget > 100 ? "text-rose-700" : "text-emerald-700"
               )}
             >
               {totalTarget.toFixed(1)}%
@@ -128,9 +128,9 @@ export function StrategyTargetsForm({
         {drafts.map((draft, index) => (
           <div
             key={draft.symbol}
-            className="grid gap-4 rounded-2xl border border-border/70 bg-background/35 p-4 xl:grid-cols-[130px_repeat(4,minmax(0,1fr))_260px]"
+            className="grid gap-4 rounded-3xl border border-border/70 bg-white p-5 shadow-sm md:grid-cols-2 2xl:grid-cols-[140px_repeat(4,minmax(0,1fr))_260px]"
           >
-            <div className="min-w-0">
+            <div className="min-w-0 md:col-span-2 2xl:col-span-1">
               <p className="font-semibold">{draft.symbol}</p>
               <p className="truncate text-xs text-muted-foreground">
                 {draft.companyName ?? "No company profile yet"}
@@ -162,7 +162,7 @@ export function StrategyTargetsForm({
               disabled={isLocked}
             />
 
-            <div className="space-y-3">
+            <div className="space-y-3 md:col-span-2 2xl:col-span-1">
               <div className="flex items-center justify-between gap-3">
                 <Label className="text-xs">Core/Satellite</Label>
                 <span className="metric-tabular text-xs text-muted-foreground">

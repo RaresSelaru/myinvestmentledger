@@ -65,12 +65,12 @@ export function PortfolioHoldingsTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 rounded-3xl border border-border/70 bg-white p-3 shadow-[0_14px_45px_rgba(15,35,34,0.06)] sm:flex-row sm:items-center">
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Filter symbol or company"
-          className="sm:max-w-xs"
+          className="sm:max-w-sm"
         />
         <Select value={sortKey} onValueChange={(value) => setSortKey(value as SortKey)}>
           <SelectTrigger className="sm:w-52">
@@ -92,11 +92,11 @@ export function PortfolioHoldingsTable({
           {direction.toUpperCase()}
         </Button>
       </div>
-      <div className="overflow-hidden rounded-lg border border-border/70 bg-card/90 shadow-lg shadow-black/10">
+      <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-[0_18px_55px_rgba(15,35,34,0.08)]">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-muted/35">
+              <TableRow className="bg-muted/35 hover:bg-muted/35">
                 <TableHead>Symbol</TableHead>
                 <TableHead>Company</TableHead>
                 <TableHead className="text-right">Market value</TableHead>

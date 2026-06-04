@@ -43,7 +43,7 @@ export default async function ImportsPage({ searchParams }: ImportsPageProps) {
       />
 
       {first(params.error) ? (
-        <p className="max-w-3xl rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <p className="max-w-5xl rounded-3xl border border-destructive/25 bg-destructive/10 px-5 py-4 text-sm text-destructive">
           {first(params.error)}
         </p>
       ) : null}

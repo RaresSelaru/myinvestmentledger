@@ -55,7 +55,7 @@ function initials(email: string) {
 
 function NavLinks({ pathname }: { pathname: string }) {
   return (
-    <nav className="grid gap-1.5">
+    <nav className="grid gap-2">
       {navigation.map((item) => {
         const Icon = item.icon;
         const active =
@@ -67,14 +67,14 @@ function NavLinks({ pathname }: { pathname: string }) {
             href={item.href}
             prefetch={false}
             className={cn(
-              "group flex h-11 items-center gap-3 rounded-2xl px-3 text-sm font-medium text-muted-foreground transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              "group flex h-12 items-center gap-3 rounded-2xl px-4 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               active &&
-                "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm shadow-black/10"
+                "bg-sidebar-accent text-sidebar-accent-foreground shadow-[0_12px_28px_rgba(20,130,72,0.08)]"
             )}
           >
             <Icon
               className={cn(
-                "size-4 transition-colors group-hover:text-primary",
+                "size-[1.125rem] transition-colors group-hover:text-primary",
                 active && "text-primary"
               )}
               aria-hidden="true"
@@ -89,7 +89,7 @@ function NavLinks({ pathname }: { pathname: string }) {
 
 function PreviewBanner() {
   return (
-    <div className="border-b border-primary/15 bg-primary/10 px-4 py-2 text-sm text-primary-foreground/90 sm:px-6 lg:px-8">
+    <div className="border-b border-primary/15 bg-primary/10 px-4 py-3 text-sm sm:px-6 lg:px-9">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-2 text-foreground">
           <LockKeyhole className="size-4 text-primary" aria-hidden="true" />
@@ -114,8 +114,8 @@ export function AppShell({
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-sidebar-border bg-sidebar/95 px-5 py-5 shadow-2xl shadow-black/20 lg:block">
-        <Link href="/dashboard" prefetch={false} className="flex items-center gap-3">
+      <aside className="fixed inset-y-0 left-0 hidden w-[19rem] border-r border-sidebar-border bg-sidebar px-6 py-7 lg:block">
+        <Link href="/dashboard" prefetch={false} className="flex items-center gap-3.5">
           <BrandMark />
           <span className="min-w-0">
             <span className="block text-base font-semibold tracking-tight">
@@ -126,14 +126,14 @@ export function AppShell({
             </span>
           </span>
         </Link>
-        <div className="mt-8">
+        <div className="mt-10">
           <NavLinks pathname={pathname} />
         </div>
       </aside>
 
-      <div className="lg:pl-72">
-        <header className="sticky top-0 z-30 border-b border-border/70 bg-background/82 backdrop-blur-xl">
-          <div className="flex min-h-20 items-center gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="lg:pl-[19rem]">
+        <header className="sticky top-0 z-30 border-b border-border/70 bg-white/82 backdrop-blur-xl">
+          <div className="flex min-h-24 items-center gap-3 px-4 sm:px-6 lg:px-9">
             <Sheet>
               <SheetTrigger asChild>
                 <Button
@@ -145,7 +145,7 @@ export function AppShell({
                   <Menu className="size-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-80">
+              <SheetContent side="left" className="w-80 bg-sidebar">
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-3 text-left">
                     <BrandMark />
@@ -172,10 +172,10 @@ export function AppShell({
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="h-11 gap-2 rounded-2xl px-2"
+                  className="h-12 gap-2 rounded-2xl px-2.5 text-foreground"
                   aria-label="Open user menu"
                 >
-                  <Avatar className="size-8">
+                  <Avatar className="size-10">
                     <AvatarFallback className="text-xs">
                       {initials(workspace.userEmail)}
                     </AvatarFallback>
@@ -219,7 +219,7 @@ export function AppShell({
           {workspace.isLocked ? <PreviewBanner /> : null}
         </header>
         <Separator className="opacity-0" />
-        <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>
+        <main className="px-4 py-8 sm:px-6 lg:px-9">{children}</main>
       </div>
     </div>
   );

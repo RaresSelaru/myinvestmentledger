@@ -22,7 +22,7 @@ export function CandidateCard({
   candidates: Candidate[];
 }) {
   return (
-    <Card className="border-border/70 bg-card/90 shadow-lg shadow-black/10">
+    <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
@@ -30,7 +30,7 @@ export function CandidateCard({
         {candidates.length ? (
           candidates.map((candidate) => (
             <Sheet key={`${candidate.kind}-${candidate.symbol}`}>
-              <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/55 px-3 py-3 transition-colors hover:bg-muted/35">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-white px-4 py-3.5 transition-colors hover:bg-accent/35">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium">{candidate.symbol}</p>
@@ -92,7 +92,7 @@ export function CandidateCard({
             </Sheet>
           ))
         ) : (
-          <p className="rounded-md border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-2xl border border-dashed border-border/80 bg-white/70 px-3 py-8 text-center text-sm text-muted-foreground">
             No candidates from current data.
           </p>
         )}
@@ -109,7 +109,7 @@ function Detail({
   value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-md bg-muted/40 p-3">
+    <div className="rounded-2xl bg-muted/45 p-3">
       <p className="text-xs text-muted-foreground">{label}</p>
       <div className="mt-1 metric-tabular font-medium">{value}</div>
     </div>

@@ -27,7 +27,7 @@ export function ExplainNumber({
       <PopoverTrigger
         className={cn(
           buttonVariants({ variant: "ghost", size: "icon-xs" }),
-          "text-muted-foreground"
+          "text-muted-foreground hover:text-primary"
         )}
         aria-label="Explain number"
       >
@@ -36,7 +36,7 @@ export function ExplainNumber({
       <PopoverContent align="start" className="w-80">
         <div className="space-y-4">
           <div>
-            <p className="text-xs font-medium uppercase text-muted-foreground">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Formula
             </p>
             <p className="mt-1 text-sm">{formula}</p>

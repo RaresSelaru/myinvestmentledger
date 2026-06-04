@@ -55,12 +55,12 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
       />
 
       {first(params.error) ? (
-        <p className="rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+        <p className="rounded-3xl border border-destructive/25 bg-destructive/10 px-5 py-4 text-sm text-destructive">
           {first(params.error)}
         </p>
       ) : null}
       {first(params.message) ? (
-        <p className="rounded-xl border border-primary/25 bg-primary/10 px-4 py-3 text-sm text-primary">
+        <p className="rounded-3xl border border-primary/25 bg-primary/10 px-5 py-4 text-sm text-primary">
           {first(params.message)}
         </p>
       ) : null}
@@ -77,7 +77,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 name="portfolioId"
                 value={workspace.activePortfolio.id}
               />
-              <label className="flex items-start gap-3 rounded-2xl border border-border/70 bg-background/35 p-4">
+              <label className="flex items-start gap-3 rounded-3xl border border-border/70 bg-muted/35 p-5">
                 <input
                   type="checkbox"
                   name="livePricesEnabled"
@@ -160,7 +160,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
               return (
                 <div
                   key={provider.value}
-                  className="rounded-2xl border border-border/70 bg-background/35 p-4"
+                  className="rounded-3xl border border-border/70 bg-white p-5 shadow-sm"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
@@ -198,7 +198,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                       ) : null}
                     </div>
                   </div>
-                  <form action={saveMarketDataApiKeyAction} className="mt-3 flex gap-2">
+                  <form action={saveMarketDataApiKeyAction} className="mt-4 flex gap-2">
                     <input type="hidden" name="provider" value={provider.value} />
                     <Input
                       name="apiKey"
@@ -235,7 +235,7 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                 <form
                   key={account.id}
                   action={saveBrokerCashOverrideAction}
-                  className="rounded-2xl border border-border/70 bg-background/35 p-4"
+                  className="rounded-3xl border border-border/70 bg-white p-5 shadow-sm"
                 >
                   <input type="hidden" name="portfolioId" value={workspace.activePortfolio.id} />
                   <input type="hidden" name="brokerAccountId" value={account.id} />
