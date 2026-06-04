@@ -1,6 +1,9 @@
 import { hasSupabaseEnv } from "@/lib/env";
 
-const legacyConfigError = "Supabase environment variables are not configured yet.";
+const staleConfigErrors = new Set([
+  "Supabase environment variables are not configured yet.",
+  "Authentication is not available yet. Refresh the page and try again.",
+]);
 
 export function AuthMessage({
   error,
@@ -10,7 +13,9 @@ export function AuthMessage({
   message?: string;
 }) {
   const visibleError =
-    error === legacyConfigError && hasSupabaseEnv() ? undefined : error;
+    error && staleConfigErrors.has(error) && hasSupabaseEnv()
+      ? undefined
+      : error;
 
   if (!visibleError && !message) {
     return null;

@@ -1,5 +1,35 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "myinvestmentledger-n9be.vercel.app" }],
+      "destination": "https://myinvestmentledger.vercel.app/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "myinvestmentledger-n9be-raresselarus-projects.vercel.app"
+        }
+      ],
+      "destination": "https://myinvestmentledger.vercel.app/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "myinvestmentledger-n9be-git-main-raresselarus-projects.vercel.app"
+        }
+      ],
+      "destination": "https://myinvestmentledger.vercel.app/:path*",
+      "permanent": true
+    }
+  ]
 }
