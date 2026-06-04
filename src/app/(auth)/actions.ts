@@ -93,7 +93,7 @@ export async function signUpAction(formData: FormData) {
     redirect("/dashboard");
   }
 
-  redirect(`/login?message=${param("Account created. Check your email to confirm it.")}`);
+  redirect(`/login?message=${param("Account created. You can log in now.")}`);
 }
 
 export async function resetPasswordAction(formData: FormData) {
