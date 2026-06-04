@@ -1,0 +1,48 @@
+import { ManualEntryDialog } from "@/components/investments/manual-entry-dialog";
+import { PageHeader } from "@/components/investments/page-header";
+import { TransactionsTable } from "@/components/investments/transactions-table";
+import { getWorkspaceData } from "@/lib/data";
+
+type TransactionsPageProps = {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+function first(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function TransactionsPage({
+  searchParams,
+}: TransactionsPageProps) {
+  const workspace = await getWorkspaceData();
+  const params = await searchParams;
+
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Transactions"
+        description="A traceable ledger of transactions and cash events."
+        actions={
+          <ManualEntryDialog
+            portfolio={workspace.activePortfolio}
+            brokerAccounts={workspace.brokerAccounts}
+          />
+        }
+      />
+      {first(params.error) ? (
+        <p className="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          {first(params.error)}
+        </p>
+      ) : null}
+      {first(params.message) ? (
+        <p className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">
+          {first(params.message)}
+        </p>
+      ) : null}
+      <TransactionsTable
+        transactions={workspace.transactions}
+        brokerAccounts={workspace.brokerAccounts}
+      />
+    </div>
+  );
+}
