@@ -1,4 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+Private investment management cockpit built with Next.js, Supabase, and Vercel.
+
+## Environment Variables
+
+Required:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
+
+Optional market data providers:
+
+```bash
+FINNHUB_API_KEY=
+FMP_API_KEY=
+ALPHA_VANTAGE_API_KEY=
+TWELVE_DATA_API_KEY=
+```
+
+Do not add the Supabase `service_role` key to this app. `NEXT_PUBLIC_*` variables are visible in the browser bundle.
+
+Pull local env vars from Vercel:
+
+```bash
+npx vercel env pull .env.local --yes
+```
+
+Add an optional provider key to Vercel:
+
+```bash
+npx vercel env add FINNHUB_API_KEY production
+npx vercel env add FINNHUB_API_KEY preview
+npx vercel env add FINNHUB_API_KEY development
+```
 
 ## Getting Started
 
