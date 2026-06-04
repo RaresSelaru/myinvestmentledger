@@ -34,6 +34,12 @@ function nullableNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function dbImportStatus(status: ImportResult["stats"]["status"]) {
+  if (status === "completed") return "succeeded";
+  if (status === "dry_run") return "pending";
+  return status;
+}
+
 function mapPositionLot(row: Record<string, unknown>): PositionLot {
   return {
     id: String(row.id),
@@ -142,7 +148,7 @@ export class SupabaseImportRepository implements ImportRepository {
           storage_path: input.storagePath,
           file_hash: input.fileHash,
           parser: "xtb_excel_v1",
-          status: "succeeded",
+          status: dbImportStatus(stats.status),
           imported_at: new Date().toISOString(),
           report_start_date: input.meta.reportStartDate,
           report_end_date: input.meta.reportEndDate,

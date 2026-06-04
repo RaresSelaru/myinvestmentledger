@@ -1,11 +1,14 @@
+"use client";
+
 import { Info } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 import type { ExplainInput, ExplainSource } from "@/lib/types";
 
 export function ExplainNumber({
@@ -21,15 +24,14 @@ export function ExplainNumber({
 }) {
   return (
     <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="text-muted-foreground"
-          aria-label="Explain number"
-        >
-          <Info className="size-3.5" />
-        </Button>
+      <PopoverTrigger
+        className={cn(
+          buttonVariants({ variant: "ghost", size: "icon-xs" }),
+          "text-muted-foreground"
+        )}
+        aria-label="Explain number"
+      >
+        <Info className="size-3.5" />
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80">
         <div className="space-y-4">

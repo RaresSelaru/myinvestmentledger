@@ -7,7 +7,7 @@ import {
   ArrowDownToLine,
   BarChart3,
   BriefcaseBusiness,
-  Landmark,
+  LockKeyhole,
   LogOut,
   Menu,
   Settings2,
@@ -25,13 +25,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import {
   Sheet,
@@ -40,8 +33,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { BrandMark } from "@/components/app/brand-mark";
+import { PortfolioSelector } from "@/components/app/portfolio-selector";
+import { ThemeToggle } from "@/components/app/theme-toggle";
 import { cn } from "@/lib/utils";
-import type { WorkspaceData } from "@/lib/types";
+import type { WorkspaceShellData } from "@/lib/types";
 
 const navigation = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
@@ -57,7 +53,7 @@ function initials(email: string) {
 
 function NavLinks({ pathname }: { pathname: string }) {
   return (
-    <nav className="grid gap-1">
+    <nav className="grid gap-1.5">
       {navigation.map((item) => {
         const Icon = item.icon;
         const active =
@@ -67,12 +63,20 @@ function NavLinks({ pathname }: { pathname: string }) {
           <Link
             key={item.href}
             href={item.href}
+            prefetch={false}
             className={cn(
-              "flex h-9 items-center gap-3 rounded-md px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              active && "bg-sidebar-accent text-sidebar-accent-foreground"
+              "group flex h-11 items-center gap-3 rounded-2xl px-3 text-sm font-medium text-muted-foreground transition-all hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              active &&
+                "bg-sidebar-accent text-sidebar-accent-foreground shadow-sm shadow-black/10"
             )}
           >
-            <Icon className="size-4" aria-hidden="true" />
+            <Icon
+              className={cn(
+                "size-4 transition-colors group-hover:text-primary",
+                active && "text-primary"
+              )}
+              aria-hidden="true"
+            />
             {item.label}
           </Link>
         );
@@ -81,26 +85,43 @@ function NavLinks({ pathname }: { pathname: string }) {
   );
 }
 
+function PreviewBanner() {
+  return (
+    <div className="border-b border-primary/15 bg-primary/10 px-4 py-2 text-sm text-primary-foreground/90 sm:px-6 lg:px-8">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 text-foreground">
+          <LockKeyhole className="size-4 text-primary" aria-hidden="true" />
+          Preview mode. Log in to import files, create portfolios, and save changes.
+        </span>
+        <Button asChild size="sm">
+          <Link href="/login">Log in</Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function AppShell({
   workspace,
   children,
 }: {
-  workspace: WorkspaceData;
+  workspace: WorkspaceShellData;
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  const brokerAccount =
-    workspace.brokerAccounts[0]?.id ?? "no-broker-account";
 
   return (
-    <div className="min-h-screen bg-background">
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r bg-sidebar px-4 py-5 lg:block">
-        <Link href="/dashboard" className="flex items-center gap-3 px-2">
-          <span className="flex size-9 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-            <Landmark className="size-4" aria-hidden="true" />
-          </span>
-          <span className="text-sm font-semibold tracking-tight">
-            Investment Ledger
+    <div className="min-h-screen bg-background text-foreground">
+      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-sidebar-border bg-sidebar/95 px-5 py-5 shadow-2xl shadow-black/20 lg:block">
+        <Link href="/dashboard" prefetch={false} className="flex items-center gap-3">
+          <BrandMark />
+          <span className="min-w-0">
+            <span className="block text-base font-semibold tracking-tight">
+              My Investment Ledger
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              Portfolio cockpit
+            </span>
           </span>
         </Link>
         <div className="mt-8">
@@ -108,27 +129,25 @@ export function AppShell({
         </div>
       </aside>
 
-      <div className="lg:pl-64">
-        <header className="sticky top-0 z-30 border-b bg-background/88 backdrop-blur-xl">
-          <div className="flex min-h-16 items-center gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="lg:pl-72">
+        <header className="sticky top-0 z-30 border-b border-border/70 bg-background/82 backdrop-blur-xl">
+          <div className="flex min-h-20 items-center gap-3 px-4 sm:px-6 lg:px-8">
             <Sheet>
               <SheetTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon"
+                  size="icon-lg"
                   className="lg:hidden"
                   aria-label="Open navigation"
                 >
-                  <Menu className="size-4" />
+                  <Menu className="size-5" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-72">
+              <SheetContent side="left" className="w-80">
                 <SheetHeader>
                   <SheetTitle className="flex items-center gap-3 text-left">
-                    <span className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                      <Landmark className="size-4" aria-hidden="true" />
-                    </span>
-                    Investment Ledger
+                    <BrandMark />
+                    My Investment Ledger
                   </SheetTitle>
                 </SheetHeader>
                 <div className="mt-6">
@@ -137,78 +156,65 @@ export function AppShell({
               </SheetContent>
             </Sheet>
 
-            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
-              <Select value={workspace.activePortfolio.id}>
-                <SelectTrigger className="h-8 w-[190px] bg-card">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {workspace.portfolios.map((portfolio) => (
-                    <SelectItem key={portfolio.id} value={portfolio.id}>
-                      {portfolio.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={brokerAccount}>
-                <SelectTrigger className="hidden h-8 w-[190px] bg-card sm:flex">
-                  <SelectValue placeholder="Broker account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {workspace.brokerAccounts.length ? (
-                    workspace.brokerAccounts.map((account) => (
-                      <SelectItem key={account.id} value={account.id}>
-                        {account.name}
-                      </SelectItem>
-                    ))
-                  ) : (
-                    <SelectItem value="no-broker-account">
-                      No broker account
-                    </SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
+            <div className="min-w-0 flex-1">
+              <PortfolioSelector
+                portfolios={workspace.portfolios}
+                activePortfolio={workspace.activePortfolio}
+                isLocked={workspace.isLocked}
+              />
             </div>
+
+            <ThemeToggle />
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  className="h-9 gap-2 px-2"
+                  className="h-11 gap-2 rounded-2xl px-2"
                   aria-label="Open user menu"
                 >
-                  <Avatar className="size-7">
+                  <Avatar className="size-8">
                     <AvatarFallback className="text-xs">
                       {initials(workspace.userEmail)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="hidden max-w-40 truncate text-sm md:inline">
-                    {workspace.userEmail}
+                  <span className="hidden max-w-44 truncate text-sm md:inline">
+                    {workspace.isLocked ? "Preview" : workspace.userEmail}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
                 <DropdownMenuLabel className="flex items-center gap-2">
                   <UserRound className="size-4" aria-hidden="true" />
-                  <span className="truncate">{workspace.userEmail}</span>
+                  <span className="truncate">
+                    {workspace.isLocked ? "Preview mode" : workspace.userEmail}
+                  </span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/strategy">Portfolio settings</Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <form action={signOutAction}>
+                {workspace.isLocked ? (
                   <DropdownMenuItem asChild>
-                    <button className="w-full" type="submit">
-                      <LogOut className="size-4" aria-hidden="true" />
-                      Log out
-                    </button>
+                    <Link href="/login">Log in</Link>
                   </DropdownMenuItem>
-                </form>
+                ) : (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/strategy">Portfolio settings</Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <form action={signOutAction}>
+                      <DropdownMenuItem asChild>
+                        <button className="w-full" type="submit">
+                          <LogOut className="size-4" aria-hidden="true" />
+                          Log out
+                        </button>
+                      </DropdownMenuItem>
+                    </form>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          {workspace.isLocked ? <PreviewBanner /> : null}
         </header>
         <Separator className="opacity-0" />
         <main className="px-4 py-6 sm:px-6 lg:px-8">{children}</main>

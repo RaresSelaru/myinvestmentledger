@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { Landmark } from "lucide-react";
+import { BrandMark } from "@/components/app/brand-mark";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 export function AuthCard({
@@ -13,14 +13,12 @@ export function AuthCard({
   children: ReactNode;
 }) {
   return (
-    <Card className="border-border/70 bg-card/95 shadow-sm">
+    <Card className="border-border/70 bg-card/95 shadow-2xl shadow-black/20">
       <CardHeader className="space-y-6">
         <Link href="/dashboard" className="flex items-center gap-3">
-          <span className="flex size-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Landmark className="size-4" aria-hidden="true" />
-          </span>
+          <BrandMark className="size-10" />
           <span className="text-sm font-semibold tracking-tight">
-            Investment Ledger
+            My Investment Ledger
           </span>
         </Link>
         <div className="space-y-2">

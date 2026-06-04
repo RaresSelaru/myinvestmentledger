@@ -21,6 +21,7 @@ export type Portfolio = {
   id: string;
   name: string;
   baseCurrency: CurrencyCode;
+  tags: string[];
 };
 
 export type BrokerAccount = {
@@ -162,6 +163,7 @@ export type PositionLot = {
 
 export type WorkspaceData = {
   isPreview: boolean;
+  isLocked: boolean;
   userEmail: string;
   portfolios: Portfolio[];
   activePortfolio: Portfolio;
@@ -172,3 +174,13 @@ export type WorkspaceData = {
   accumulationCandidates: Candidate[];
   trimmingCandidates: Candidate[];
 };
+
+export type WorkspaceShellData = Pick<
+  WorkspaceData,
+  | "isPreview"
+  | "isLocked"
+  | "userEmail"
+  | "portfolios"
+  | "activePortfolio"
+  | "brokerAccounts"
+>;

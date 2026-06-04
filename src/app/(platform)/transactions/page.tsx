@@ -26,6 +26,7 @@ export default async function TransactionsPage({
           <ManualEntryDialog
             portfolio={workspace.activePortfolio}
             brokerAccounts={workspace.brokerAccounts}
+            isLocked={workspace.isLocked}
           />
         }
       />

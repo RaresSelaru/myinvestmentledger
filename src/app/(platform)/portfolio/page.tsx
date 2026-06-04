@@ -22,6 +22,7 @@ export default async function PortfolioPage() {
         <EmptyState
           title="No holdings yet"
           description="Once imported or manually added positions exist, this table becomes the full portfolio view."
+          isLocked={workspace.isLocked}
         />
       )}
     </div>

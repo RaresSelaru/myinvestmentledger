@@ -49,6 +49,32 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
     (transaction) => transaction.symbol === holding.symbol
   );
 
+  if (workspace.isLocked) {
+    return (
+      <div className="space-y-6">
+        <Button asChild variant="ghost" size="sm">
+          <Link href="/portfolio">
+            <ArrowLeft className="size-4" aria-hidden="true" />
+            Portfolio
+          </Link>
+        </Button>
+        <Card className="border-primary/20 bg-card/90">
+          <CardContent className="flex flex-col items-center justify-center gap-4 py-14 text-center">
+            <div>
+              <p className="text-2xl font-semibold tracking-tight">{holding.symbol}</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Position-level details, source rows, and transaction traceability are available after login.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/login">Log in</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <Button asChild variant="ghost" size="sm">

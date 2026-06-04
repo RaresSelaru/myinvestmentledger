@@ -1,5 +1,5 @@
 import { SlidersHorizontal } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Sheet,
@@ -11,6 +11,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SignedPercent } from "@/components/investments/signed-value";
 import { formatMoneyPrecise, formatPercent } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { Candidate } from "@/lib/types";
 
 export function CandidateCard({
@@ -21,7 +22,7 @@ export function CandidateCard({
   candidates: Candidate[];
 }) {
   return (
-    <Card className="border-border/70 shadow-sm">
+    <Card className="border-border/70 bg-card/90 shadow-lg shadow-black/10">
       <CardHeader className="pb-3">
         <CardTitle className="text-base">{title}</CardTitle>
       </CardHeader>
@@ -29,7 +30,7 @@ export function CandidateCard({
         {candidates.length ? (
           candidates.map((candidate) => (
             <Sheet key={`${candidate.kind}-${candidate.symbol}`}>
-              <div className="flex items-center justify-between gap-3 rounded-md border bg-background px-3 py-2.5">
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border/70 bg-background/55 px-3 py-3 transition-colors hover:bg-muted/35">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium">{candidate.symbol}</p>
@@ -43,10 +44,11 @@ export function CandidateCard({
                     <SignedPercent value={candidate.drift} context="drift" />
                   </div>
                 </div>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon-sm" aria-label={`Explain ${candidate.symbol}`}>
-                    <SlidersHorizontal className="size-4" />
-                  </Button>
+                <SheetTrigger
+                  className={cn(buttonVariants({ variant: "ghost", size: "icon-sm" }))}
+                  aria-label={`Explain ${candidate.symbol}`}
+                >
+                  <SlidersHorizontal className="size-4" />
                 </SheetTrigger>
               </div>
               <SheetContent>

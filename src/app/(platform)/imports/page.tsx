@@ -1,15 +1,6 @@
-import { dryRunImportAction, uploadImportAction } from "@/app/(platform)/actions";
-import { Button } from "@/components/ui/button";
+import { commitStagedImportAction, dryRunImportAction } from "@/app/(platform)/actions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { ImportReportForm } from "@/components/investments/import-report-form";
 import { PageHeader } from "@/components/investments/page-header";
 import { getWorkspaceData } from "@/lib/data";
 
@@ -32,62 +23,30 @@ export default async function ImportsPage({ searchParams }: ImportsPageProps) {
         description="Upload XTB Excel reports and keep broker source files private."
       />
 
-      <Card className="max-w-2xl">
-        <CardHeader>
-          <CardTitle className="text-base">XTB report</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form action={uploadImportAction} className="space-y-4">
-            <input
-              type="hidden"
-              name="portfolioId"
-              value={workspace.activePortfolio.id}
-            />
-            <div className="space-y-2">
-              <Label>Broker account</Label>
-              <Select name="brokerAccountId" defaultValue={workspace.brokerAccounts[0]?.id}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select account" />
-                </SelectTrigger>
-                <SelectContent>
-                  {workspace.brokerAccounts.map((account) => (
-                    <SelectItem key={account.id} value={account.id}>
-                      {account.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="file">Excel file</Label>
-              <Input
-                id="file"
-                name="file"
-                type="file"
-                accept=".xlsx,.xls,.csv"
-                required
-              />
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="submit" formAction={dryRunImportAction} variant="outline">
-                Dry run
-              </Button>
-              <Button type="submit" formAction={uploadImportAction}>
-                Import report
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      <ImportReportForm
+        portfolio={workspace.activePortfolio}
+        brokerAccounts={workspace.brokerAccounts}
+        isLocked={workspace.isLocked}
+        stagedImportId={first(params.stagedImportId)}
+        result={{
+          message: first(params.message),
+          parsed: first(params.parsed),
+          lots: first(params.lots),
+          cash: first(params.cash),
+          transactions: first(params.transactions),
+        }}
+        dryRunAction={dryRunImportAction}
+        commitAction={commitStagedImportAction}
+      />
 
       {first(params.error) ? (
-        <p className="max-w-2xl rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+        <p className="max-w-3xl rounded-xl border border-destructive/25 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {first(params.error)}
         </p>
       ) : null}
 
       {first(params.message) ? (
-        <Card className="max-w-2xl">
+        <Card className="max-w-3xl">
           <CardHeader>
             <CardTitle className="text-base">Import result</CardTitle>
           </CardHeader>

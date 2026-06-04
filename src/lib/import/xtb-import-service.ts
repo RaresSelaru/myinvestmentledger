@@ -33,7 +33,8 @@ export type ImportResult = {
     newRows: number;
     duplicatesIgnored: number;
     correctedRows: number;
-    status: "completed" | "dry_run";
+    status: "processing" | "completed" | "dry_run" | "failed";
+    error?: string;
   };
   meta: XtbWorkbookMeta;
 };
@@ -147,66 +148,74 @@ export async function commitXtbImport({
     newRows: 0,
     duplicatesIgnored: 0,
     correctedRows: 0,
-    status: "completed",
+    status: "processing",
   };
   const importedFileId = await repository.upsertImportedFile(
     { ...file, meta: parsed.meta },
     stats
   );
 
-  for (const row of parsed.rows) {
-    const existing = await repository.findRawRow({
-      userId: file.userId,
-      brokerAccountId: file.brokerAccountId,
-      sourceFingerprint: row.sourceFingerprint,
-    });
+  try {
+    for (const row of parsed.rows) {
+      const existing = await repository.findRawRow({
+        userId: file.userId,
+        brokerAccountId: file.brokerAccountId,
+        sourceFingerprint: row.sourceFingerprint,
+      });
 
-    if (existing?.fullRowHash === row.fullRowHash) {
-      stats.duplicatesIgnored += 1;
-      continue;
+      const rawRow =
+        existing?.fullRowHash === row.fullRowHash
+          ? existing
+          : existing
+            ? await repository.updateRawRow(existing.id, {
+                userId: file.userId,
+                portfolioId: file.portfolioId,
+                brokerAccountId: file.brokerAccountId,
+                importedFileId,
+                row,
+                status: "corrected",
+              })
+            : await repository.insertRawRow({
+                userId: file.userId,
+                portfolioId: file.portfolioId,
+                brokerAccountId: file.brokerAccountId,
+                importedFileId,
+                row,
+                status: "new",
+              });
+
+      if (existing?.fullRowHash === row.fullRowHash) {
+        stats.duplicatesIgnored += 1;
+      } else if (existing) {
+        stats.correctedRows += 1;
+      } else {
+        stats.newRows += 1;
+      }
+
+      await writeNormalizedRows(repository, {
+        userId: file.userId,
+        portfolioId: file.portfolioId,
+        brokerAccountId: file.brokerAccountId,
+        importedFileId,
+        row,
+        rawImportRowId: rawRow.id,
+      });
     }
 
-    const rawRow = existing
-      ? await repository.updateRawRow(existing.id, {
-          userId: file.userId,
-          portfolioId: file.portfolioId,
-          brokerAccountId: file.brokerAccountId,
-          importedFileId,
-          row,
-          status: "corrected",
-        })
-      : await repository.insertRawRow({
-          userId: file.userId,
-          portfolioId: file.portfolioId,
-          brokerAccountId: file.brokerAccountId,
-          importedFileId,
-          row,
-          status: "new",
-        });
-
-    if (existing) {
-      stats.correctedRows += 1;
-    } else {
-      stats.newRows += 1;
-    }
-
-    await writeNormalizedRows(repository, {
+    stats.status = "completed";
+    await repository.upsertImportedFile({ ...file, id: importedFileId, meta: parsed.meta }, stats);
+    await repository.recomputePortfolio({
       userId: file.userId,
       portfolioId: file.portfolioId,
       brokerAccountId: file.brokerAccountId,
       importedFileId,
-      row,
-      rawImportRowId: rawRow.id,
     });
+  } catch (error) {
+    stats.status = "failed";
+    stats.error = error instanceof Error ? error.message : "Import failed";
+    await repository.upsertImportedFile({ ...file, id: importedFileId, meta: parsed.meta }, stats);
+    throw error;
   }
-
-  await repository.upsertImportedFile({ ...file, id: importedFileId, meta: parsed.meta }, stats);
-  await repository.recomputePortfolio({
-    userId: file.userId,
-    portfolioId: file.portfolioId,
-    brokerAccountId: file.brokerAccountId,
-    importedFileId,
-  });
 
   return {
     importedFileId,

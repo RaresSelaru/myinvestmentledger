@@ -29,3 +29,26 @@ export const importUploadSchema = z.object({
   portfolioId: z.string().uuid(),
   brokerAccountId: z.string().uuid(),
 });
+
+export const portfolioCreateSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  tags: z
+    .string()
+    .trim()
+    .max(160)
+    .optional()
+    .or(z.literal("")),
+  baseCurrency: z.enum(["RON", "EUR", "USD"]),
+  redirectTo: z.string().optional().or(z.literal("")),
+});
+
+export const portfolioSelectSchema = z.object({
+  portfolioId: z.string().uuid(),
+  redirectTo: z.string().optional().or(z.literal("")),
+});
+
+export const stagedImportSchema = z.object({
+  portfolioId: z.string().uuid(),
+  brokerAccountId: z.string().uuid(),
+  stagedImportId: z.string().uuid().optional().or(z.literal("")),
+});

@@ -186,6 +186,32 @@ describe("XTB import engine", () => {
     expect(repository.recomputeCalls).toBe(2);
   });
 
+  it("repairs duplicate raw rows that are missing normalized records", async () => {
+    const buffer = fs.readFileSync(fixturePath);
+    const repository = new MemoryImportRepository();
+    const first = await commitXtbImport({
+      buffer,
+      file: importFile("same"),
+      repository,
+    });
+
+    repository.transactions.clear();
+    repository.lots.clear();
+    repository.cash.clear();
+
+    const second = await commitXtbImport({
+      buffer,
+      file: importFile("same"),
+      repository,
+    });
+
+    expect(second.stats.newRows).toBe(0);
+    expect(second.stats.duplicatesIgnored).toBe(first.stats.parsedRows);
+    expect(repository.transactions.size).toBeGreaterThan(400);
+    expect(repository.cash.size).toBeGreaterThan(300);
+    expect(repository.lots.size).toBeGreaterThan(50);
+  });
+
   it("inserts missing historical rows from overlapping later imports", async () => {
     const buffer = fs.readFileSync(fixturePath);
     const repository = new MemoryImportRepository();

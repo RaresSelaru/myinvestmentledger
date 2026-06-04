@@ -101,6 +101,7 @@ export default async function DashboardPage() {
         <EmptyState
           title="No holdings yet"
           description="Import an XTB report or add a manual entry to start building the consolidated portfolio view."
+          isLocked={workspace.isLocked}
         />
       )}
     </div>

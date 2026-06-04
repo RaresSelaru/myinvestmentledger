@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { computePortfolioSummary, enrichHoldings, rankCandidates } from "@/lib/finance";
 import { getPreviewWorkspaceData } from "@/lib/mock-data";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -8,21 +8,17 @@ import type {
   Portfolio,
   Transaction,
   WorkspaceData,
+  WorkspaceShellData,
 } from "@/lib/types";
 
 type SupabaseClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+
+const ACTIVE_PORTFOLIO_COOKIE = "mil_active_portfolio_id";
 
 async function ensureDefaultWorkspace(
   supabase: SupabaseClient,
   user: { id: string; email?: string }
 ) {
-  await supabase.from("profiles").upsert({
-    user_id: user.id,
-    email: user.email ?? null,
-    default_currency: "RON",
-    updated_at: new Date().toISOString(),
-  });
-
   const { data: existingPortfolio } = await supabase
     .from("portfolios")
     .select("id")
@@ -32,26 +28,15 @@ async function ensureDefaultWorkspace(
     .maybeSingle();
 
   if (existingPortfolio?.id) {
-    const { data: existingBrokerAccount } = await supabase
-      .from("broker_accounts")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("portfolio_id", existingPortfolio.id)
-      .limit(1)
-      .maybeSingle();
-
-    if (!existingBrokerAccount?.id) {
-      await supabase.from("broker_accounts").insert({
-        user_id: user.id,
-        portfolio_id: existingPortfolio.id,
-        name: "XTB RON account",
-        broker: "XTB",
-        base_currency: "RON",
-      });
-    }
-
     return existingPortfolio.id as string;
   }
+
+  await supabase.from("profiles").upsert({
+    user_id: user.id,
+    email: user.email ?? null,
+    default_currency: "RON",
+    updated_at: new Date().toISOString(),
+  });
 
   const { data: portfolio } = await supabase
     .from("portfolios")
@@ -59,6 +44,7 @@ async function ensureDefaultWorkspace(
       user_id: user.id,
       name: "Main Portfolio",
       base_currency: "RON",
+      tags: ["core"],
     })
     .select("id")
     .single();
@@ -89,6 +75,7 @@ function mapPortfolio(row: Record<string, unknown>): Portfolio {
     id: String(row.id),
     name: String(row.name ?? "Main Portfolio"),
     baseCurrency: String(row.base_currency ?? "RON"),
+    tags: Array.isArray(row.tags) ? row.tags.map(String) : [],
   };
 }
 
@@ -163,11 +150,34 @@ function mapTransaction(row: Record<string, unknown>): Transaction {
   };
 }
 
-export async function getWorkspaceData(): Promise<WorkspaceData> {
+function previewShell(): WorkspaceShellData {
+  const preview = getPreviewWorkspaceData();
+
+  return {
+    isPreview: preview.isPreview,
+    isLocked: preview.isLocked,
+    userEmail: preview.userEmail,
+    portfolios: preview.portfolios,
+    activePortfolio: preview.activePortfolio,
+    brokerAccounts: preview.brokerAccounts,
+  };
+}
+
+async function getWorkspaceBase(): Promise<{
+  supabase: SupabaseClient | null;
+  userId: string | null;
+  userEmail: string;
+  isPreview: boolean;
+  isLocked: boolean;
+  portfolios: Portfolio[];
+  activePortfolio: Portfolio;
+  brokerAccounts: BrokerAccount[];
+}> {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    return getPreviewWorkspaceData();
+    const preview = getPreviewWorkspaceData();
+    return { ...preview, supabase: null, userId: null };
   }
 
   const {
@@ -175,55 +185,115 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    const preview = getPreviewWorkspaceData();
+    return { ...preview, supabase: null, userId: null };
   }
 
-  const activePortfolioId = await ensureDefaultWorkspace(supabase, {
+  await ensureDefaultWorkspace(supabase, {
     id: user.id,
     email: user.email ?? undefined,
   });
 
-  const [{ data: portfolioRows }, { data: brokerRows }, { data: holdingRows }, { data: transactionRows }] =
-    await Promise.all([
-      supabase
-        .from("portfolios")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("broker_accounts")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("holdings")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("portfolio_id", activePortfolioId)
-        .order("symbol", { ascending: true }),
-      supabase
-        .from("transactions")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("portfolio_id", activePortfolioId)
-        .order("occurred_at", { ascending: false })
-        .limit(20),
-    ]);
+  const { data: portfolioRows } = await supabase
+    .from("portfolios")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: true });
 
   const portfolios = (portfolioRows ?? []).map((row) =>
     mapPortfolio(row as Record<string, unknown>)
   );
+  const cookieStore = await cookies();
+  const selectedPortfolioId = cookieStore.get(ACTIVE_PORTFOLIO_COOKIE)?.value;
   const activePortfolio =
-    portfolios.find((portfolio) => portfolio.id === activePortfolioId) ??
+    portfolios.find((portfolio) => portfolio.id === selectedPortfolioId) ??
     portfolios[0] ??
     {
-      id: String(activePortfolioId),
+      id: "missing-portfolio",
       name: "Main Portfolio",
       baseCurrency: "RON",
+      tags: [],
     };
-  const brokerAccounts = (brokerRows ?? []).map((row) =>
-    mapBrokerAccount(row as Record<string, unknown>)
-  );
+
+  let { data: brokerRows } = await supabase
+    .from("broker_accounts")
+    .select("*")
+    .eq("user_id", user.id)
+    .eq("portfolio_id", activePortfolio.id)
+    .order("created_at", { ascending: true });
+
+  if (!brokerRows?.length && activePortfolio.id !== "missing-portfolio") {
+    await supabase.from("broker_accounts").insert({
+      user_id: user.id,
+      portfolio_id: activePortfolio.id,
+      name: `XTB ${activePortfolio.baseCurrency} account`,
+      broker: "XTB",
+      base_currency: activePortfolio.baseCurrency,
+    });
+
+    const refreshed = await supabase
+      .from("broker_accounts")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("portfolio_id", activePortfolio.id)
+      .order("created_at", { ascending: true });
+    brokerRows = refreshed.data;
+  }
+
+  return {
+    supabase,
+    userId: user.id,
+    userEmail: user.email ?? "Signed in",
+    isPreview: false,
+    isLocked: false,
+    portfolios,
+    activePortfolio,
+    brokerAccounts: (brokerRows ?? []).map((row) =>
+      mapBrokerAccount(row as Record<string, unknown>)
+    ),
+  };
+}
+
+export async function getWorkspaceShellData(): Promise<WorkspaceShellData> {
+  const base = await getWorkspaceBase();
+
+  if (base.isPreview) {
+    return previewShell();
+  }
+
+  return {
+    isPreview: base.isPreview,
+    isLocked: base.isLocked,
+    userEmail: base.userEmail,
+    portfolios: base.portfolios,
+    activePortfolio: base.activePortfolio,
+    brokerAccounts: base.brokerAccounts,
+  };
+}
+
+export async function getWorkspaceData(): Promise<WorkspaceData> {
+  const base = await getWorkspaceBase();
+
+  if (base.isPreview || !base.supabase || !base.userId) {
+    return getPreviewWorkspaceData();
+  }
+
+  const [{ data: holdingRows }, { data: transactionRows }] = await Promise.all([
+    base.supabase
+      .from("holdings")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("symbol", { ascending: true }),
+    base.supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("occurred_at", { ascending: false })
+      .limit(50),
+  ]);
+
   const rawHoldings = (holdingRows ?? []).map((row) =>
     mapHolding(row as Record<string, unknown>)
   );
@@ -233,16 +303,17 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
   const summary = computePortfolioSummary(
     rawHoldings,
     transactions,
-    activePortfolio.baseCurrency
+    base.activePortfolio.baseCurrency
   );
   const holdings = enrichHoldings(rawHoldings, summary.totalValue);
 
   return {
-    isPreview: false,
-    userEmail: user.email ?? "Signed in",
-    portfolios,
-    activePortfolio,
-    brokerAccounts,
+    isPreview: base.isPreview,
+    isLocked: base.isLocked,
+    userEmail: base.userEmail,
+    portfolios: base.portfolios,
+    activePortfolio: base.activePortfolio,
+    brokerAccounts: base.brokerAccounts,
     holdings,
     transactions,
     summary,

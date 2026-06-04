@@ -9,6 +9,7 @@ const portfolio: Portfolio = {
   id: "preview-portfolio",
   name: "Main Portfolio",
   baseCurrency: "RON",
+  tags: ["demo", "core"],
 };
 
 export const previewBrokerAccounts: BrokerAccount[] = [
@@ -171,6 +172,7 @@ export function getPreviewWorkspaceData(): WorkspaceData {
 
   return {
     isPreview: true,
+    isLocked: true,
     userEmail: "preview@investment-ledger.local",
     portfolios: [portfolio],
     activePortfolio: portfolio,

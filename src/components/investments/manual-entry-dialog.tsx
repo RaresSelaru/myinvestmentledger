@@ -1,4 +1,5 @@
 import { Plus } from "lucide-react";
+import Link from "next/link";
 import { addManualTransactionAction } from "@/app/(platform)/actions";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,10 +24,23 @@ import type { BrokerAccount, Portfolio } from "@/lib/types";
 export function ManualEntryDialog({
   portfolio,
   brokerAccounts,
+  isLocked = false,
 }: {
   portfolio: Portfolio;
   brokerAccounts: BrokerAccount[];
+  isLocked?: boolean;
 }) {
+  if (isLocked) {
+    return (
+      <Button asChild>
+        <Link href="/login">
+          <Plus className="size-4" aria-hidden="true" />
+          Log in to add entry
+        </Link>
+      </Button>
+    );
+  }
+
   return (
     <Dialog>
       <DialogTrigger asChild>

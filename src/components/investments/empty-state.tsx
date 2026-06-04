@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button";
 export function EmptyState({
   title,
   description,
+  isLocked = false,
 }: {
   title: string;
   description: string;
+  isLocked?: boolean;
 }) {
   return (
-    <div className="flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed bg-card px-6 py-10 text-center">
-      <div className="flex size-10 items-center justify-center rounded-md bg-accent text-accent-foreground">
+    <div className="flex min-h-72 flex-col items-center justify-center rounded-lg border border-dashed bg-card/80 px-6 py-10 text-center">
+      <div className="flex size-12 items-center justify-center rounded-lg bg-accent text-accent-foreground">
         <ArrowDownToLine className="size-4" aria-hidden="true" />
       </div>
       <h2 className="mt-4 text-lg font-semibold tracking-tight">{title}</h2>
@@ -20,17 +22,19 @@ export function EmptyState({
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-2">
         <Button asChild>
-          <Link href="/imports">
+          <Link href={isLocked ? "/login" : "/imports"}>
             <ArrowDownToLine className="size-4" aria-hidden="true" />
-            Import report
+            {isLocked ? "Log in" : "Import report"}
           </Link>
         </Button>
-        <Button asChild variant="outline">
-          <Link href="/transactions">
-            <Plus className="size-4" aria-hidden="true" />
-            Manual entry
-          </Link>
-        </Button>
+        {!isLocked ? (
+          <Button asChild variant="outline">
+            <Link href="/transactions">
+              <Plus className="size-4" aria-hidden="true" />
+              Manual entry
+            </Link>
+          </Button>
+        ) : null}
       </div>
     </div>
   );

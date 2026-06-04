@@ -30,11 +30,11 @@ export function AllocationTable({
   const [expanded, setExpanded] = useState<string | null>(holdings[0]?.symbol ?? null);
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
+    <div className="overflow-hidden rounded-lg border border-border/70 bg-card/90 shadow-lg shadow-black/10">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow className="bg-muted/40">
+              <TableRow className="bg-muted/35">
               <TableHead className="w-10" />
               <TableHead>Symbol</TableHead>
               <TableHead>Company</TableHead>
@@ -55,7 +55,7 @@ export function AllocationTable({
 
               return (
                 <Fragment key={holding.symbol}>
-                  <TableRow key={holding.symbol} className="hover:bg-muted/30">
+                  <TableRow key={holding.symbol} className="hover:bg-muted/35">
                     <TableCell>
                       <Button
                         variant="ghost"
