@@ -9,7 +9,7 @@ export function AuthCard({
   children,
 }: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   children: ReactNode;
 }) {
   return (
@@ -25,7 +25,9 @@ export function AuthCard({
         </Link>
         <div className="space-y-2">
           <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          <p className="text-sm leading-6 text-muted-foreground">{subtitle}</p>
+          {subtitle ? (
+            <p className="text-sm leading-6 text-muted-foreground">{subtitle}</p>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent>{children}</CardContent>

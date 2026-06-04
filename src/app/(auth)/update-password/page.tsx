@@ -1,12 +1,11 @@
-import Link from "next/link";
-import { signUpAction } from "@/app/(auth)/actions";
+import { updatePasswordAction } from "@/app/(auth)/actions";
 import { AuthCard } from "@/components/auth/auth-card";
 import { AuthMessage } from "@/components/auth/auth-message";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type SignupPageProps = {
+type UpdatePasswordPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
@@ -14,19 +13,17 @@ function first(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
-export default async function SignupPage({ searchParams }: SignupPageProps) {
+export default async function UpdatePasswordPage({
+  searchParams,
+}: UpdatePasswordPageProps) {
   const params = await searchParams;
 
   return (
-    <AuthCard title="Create account">
-      <form action={signUpAction} className="space-y-4">
+    <AuthCard title="Set new password" subtitle="Choose a new password for your account.">
+      <form action={updatePasswordAction} className="space-y-4">
         <AuthMessage error={first(params.error)} />
         <div className="space-y-2">
-          <Label htmlFor="email">Email</Label>
-          <Input id="email" name="email" type="email" autoComplete="email" required />
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">New password</Label>
           <Input
             id="password"
             name="password"
@@ -37,14 +34,8 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
           />
         </div>
         <Button className="w-full" type="submit">
-          Sign up
+          Save password
         </Button>
-        <p className="text-center text-sm text-muted-foreground">
-          Already have an account?{" "}
-          <Link className="font-medium text-foreground" href="/login">
-            Log in
-          </Link>
-        </p>
       </form>
     </AuthCard>
   );

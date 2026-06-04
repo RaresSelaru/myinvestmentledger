@@ -22,6 +22,10 @@ const resetSchema = z.object({
   email: emailSchema,
 });
 
+const updatePasswordSchema = z.object({
+  password: passwordSchema,
+});
+
 function param(message: string) {
   return encodeURIComponent(message);
 }
@@ -70,11 +74,11 @@ export async function signUpAction(formData: FormData) {
   const headerStore = await headers();
   const origin = headerStore.get("origin") ?? "http://localhost:3000";
 
-  const { error } = await supabase.auth.signUp({
+  const { data, error } = await supabase.auth.signUp({
     email: parsed.data.email,
     password: parsed.data.password,
     options: {
-      emailRedirectTo: `${origin}/dashboard`,
+      emailRedirectTo: `${origin}/auth/callback?next=/dashboard`,
     },
   });
 
@@ -82,7 +86,11 @@ export async function signUpAction(formData: FormData) {
     redirect(`/signup?error=${param(error.message)}`);
   }
 
-  redirect(`/login?message=${param("Account created. Check your email if confirmation is enabled.")}`);
+  if (data.session) {
+    redirect("/dashboard");
+  }
+
+  redirect(`/login?message=${param("Account created. Check your email to confirm it.")}`);
 }
 
 export async function resetPasswordAction(formData: FormData) {
@@ -104,7 +112,7 @@ export async function resetPasswordAction(formData: FormData) {
   const origin = headerStore.get("origin") ?? "http://localhost:3000";
 
   const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${origin}/login`,
+    redirectTo: `${origin}/auth/callback?next=/update-password`,
   });
 
   if (error) {
@@ -112,4 +120,30 @@ export async function resetPasswordAction(formData: FormData) {
   }
 
   redirect(`/login?message=${param("Password reset link sent.")}`);
+}
+
+export async function updatePasswordAction(formData: FormData) {
+  const parsed = updatePasswordSchema.safeParse({
+    password: formData.get("password"),
+  });
+
+  if (!parsed.success) {
+    redirect(`/update-password?error=${param("Use a password with at least 8 characters.")}`);
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  if (!supabase) {
+    redirect(`/update-password?error=${param("Supabase environment variables are not configured yet.")}`);
+  }
+
+  const { error } = await supabase.auth.updateUser({
+    password: parsed.data.password,
+  });
+
+  if (error) {
+    redirect(`/update-password?error=${param(error.message)}`);
+  }
+
+  redirect("/dashboard");
 }
