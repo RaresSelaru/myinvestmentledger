@@ -30,6 +30,9 @@ function param(message: string) {
   return encodeURIComponent(message);
 }
 
+const authUnavailableMessage =
+  "Authentication is not available yet. Refresh the page and try again.";
+
 export async function signInAction(formData: FormData) {
   const parsed = signInSchema.safeParse({
     email: formData.get("email"),
@@ -43,7 +46,7 @@ export async function signInAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    redirect(`/login?error=${param("Supabase environment variables are not configured yet.")}`);
+    redirect(`/login?error=${param(authUnavailableMessage)}`);
   }
 
   const { error } = await supabase.auth.signInWithPassword(parsed.data);
@@ -68,7 +71,7 @@ export async function signUpAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    redirect(`/signup?error=${param("Supabase environment variables are not configured yet.")}`);
+    redirect(`/signup?error=${param(authUnavailableMessage)}`);
   }
 
   const headerStore = await headers();
@@ -105,7 +108,7 @@ export async function resetPasswordAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    redirect(`/forgot-password?error=${param("Supabase environment variables are not configured yet.")}`);
+    redirect(`/forgot-password?error=${param(authUnavailableMessage)}`);
   }
 
   const headerStore = await headers();
@@ -134,7 +137,7 @@ export async function updatePasswordAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    redirect(`/update-password?error=${param("Supabase environment variables are not configured yet.")}`);
+    redirect(`/update-password?error=${param(authUnavailableMessage)}`);
   }
 
   const { error } = await supabase.auth.updateUser({

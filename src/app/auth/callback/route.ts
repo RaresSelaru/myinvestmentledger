@@ -34,7 +34,11 @@ export async function GET(request: NextRequest) {
   if (!supabase) {
     return NextResponse.redirect(
       new URL(
-        withMessage("/login", "error", "Supabase environment variables are not configured yet."),
+        withMessage(
+          "/login",
+          "error",
+          "Authentication is not available yet. Refresh the page and try again."
+        ),
         requestUrl.origin
       )
     );

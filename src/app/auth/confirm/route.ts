@@ -32,7 +32,10 @@ export async function GET(request: NextRequest) {
 
   if (!supabase) {
     return NextResponse.redirect(
-      loginError("Supabase environment variables are not configured yet.", requestUrl.origin)
+      loginError(
+        "Authentication is not available yet. Refresh the page and try again.",
+        requestUrl.origin
+      )
     );
   }
 
