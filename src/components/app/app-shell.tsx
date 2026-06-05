@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowDownToLine,
   BarChart3,
@@ -49,6 +49,7 @@ const navigation = [
   { href: "/strategy", label: "Strategy", icon: SlidersHorizontal },
   { href: "/settings", label: "Settings", icon: Settings2 },
 ];
+const navigationHrefs = navigation.map((item) => item.href);
 
 function initials(email: string) {
   return email.slice(0, 2).toUpperCase();
@@ -72,6 +73,7 @@ function NavLinks({
           <Link
             key={item.href}
             href={item.href}
+            prefetch={true}
             onNavigate={() => onNavigate?.(item.href)}
             className={cn(
               "group flex h-12 items-center gap-3 rounded-2xl px-4 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
@@ -118,10 +120,44 @@ export function AppShell({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [optimisticPath, setOptimisticPath] = useState<string | null>(null);
   const pendingPath =
     optimisticPath && optimisticPath !== pathname ? optimisticPath : null;
   const visiblePathname = pendingPath ?? pathname;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function warmRoutes() {
+      for (const href of navigationHrefs) {
+        if (!cancelled && href !== pathname) {
+          router.prefetch(href, {
+            kind: "full",
+            onInvalidate: warmRoutes,
+          } as Parameters<typeof router.prefetch>[1]);
+        }
+      }
+    }
+
+    const timeout = window.setTimeout(warmRoutes, 250);
+    const onFocus = () => warmRoutes();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        warmRoutes();
+      }
+    };
+
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeout);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [pathname, router]);
 
   function handleNavigate(href: string) {
     if (href !== pathname) {
@@ -134,6 +170,7 @@ export function AppShell({
       <aside className="fixed inset-y-0 left-0 hidden w-[19rem] border-r border-sidebar-border bg-sidebar px-6 py-7 lg:block">
         <Link
           href="/dashboard"
+          prefetch={true}
           onNavigate={() => handleNavigate("/dashboard")}
           className="flex items-center gap-3.5"
         >
