@@ -71,7 +71,7 @@ export function PortfolioHoldingsTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-3xl border border-border/70 bg-white p-3 shadow-[0_14px_45px_rgba(15,35,34,0.06)] sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 rounded-3xl border border-border/70 bg-card p-3 shadow-[0_14px_45px_rgba(15,35,34,0.06)] sm:flex-row sm:items-center">
         <Input
           value={query}
           onChange={(event) => setQuery(event.target.value)}

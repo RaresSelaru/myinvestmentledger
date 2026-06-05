@@ -1,6 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { PageHeader } from "@/components/investments/page-header";
 import { StrategyTargetsForm } from "@/components/investments/strategy-targets-form";
 import { getStrategyData } from "@/lib/data";
 import { formatPercent } from "@/lib/format";
@@ -27,11 +26,6 @@ export default async function StrategyPage({ searchParams }: StrategyPageProps) 
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Strategy"
-        description="Allocation targets, target prices, and core/satellite discipline."
-      />
-
       {first(params.error) ? (
         <p className="rounded-3xl border border-destructive/25 bg-destructive/10 px-5 py-4 text-sm text-destructive">
           {first(params.error)}
@@ -69,16 +63,11 @@ export default async function StrategyPage({ searchParams }: StrategyPageProps) 
               <CardTitle className="text-base">Portfolio</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="rounded-3xl border border-border/70 bg-white p-5 shadow-sm">
+              <div className="rounded-3xl border border-border/70 bg-card p-5 shadow-sm">
                 <p className="font-semibold">{workspace.activePortfolio.name}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Base currency: {workspace.activePortfolio.baseCurrency}
                 </p>
-                {workspace.activePortfolio.tags.length ? (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {workspace.activePortfolio.tags.join(" · ")}
-                  </p>
-                ) : null}
               </div>
               <div className="rounded-3xl border border-border/70 bg-muted/35 p-5 text-sm text-muted-foreground">
                 Technical configuration, live prices, API keys, and cash overrides live in Settings.
@@ -92,7 +81,7 @@ export default async function StrategyPage({ searchParams }: StrategyPageProps) 
             </CardHeader>
             <CardContent className="space-y-3">
               {workspace.brokerAccounts.map((account) => (
-                <div key={account.id} className="rounded-2xl border border-border/70 bg-white p-4 text-sm shadow-sm">
+                <div key={account.id} className="rounded-2xl border border-border/70 bg-card p-4 text-sm shadow-sm">
                   <div className="flex items-center justify-between gap-3">
                     <p className="font-medium">{account.name}</p>
                     <span className="metric-tabular text-muted-foreground">

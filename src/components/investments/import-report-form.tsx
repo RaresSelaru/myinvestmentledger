@@ -55,7 +55,7 @@ export function ImportReportForm({
 
   if (isLocked) {
     return (
-      <Card className="max-w-4xl border-primary/20 bg-white">
+      <Card className="max-w-4xl border-primary/20 bg-card">
         <CardContent className="flex flex-col gap-5 p-7 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3">
             <span className="soft-green-icon size-12">

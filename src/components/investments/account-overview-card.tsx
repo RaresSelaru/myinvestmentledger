@@ -67,8 +67,8 @@ function MoneyDelta({
     <span
       className={cn(
         "metric-tabular font-semibold",
-        value > 0 && "text-emerald-700",
-        value < 0 && "text-rose-700"
+        value > 0 && "text-emerald-700 dark:text-emerald-300",
+        value < 0 && "text-rose-700 dark:text-rose-300"
       )}
     >
       {formatCurrency(value, currency)}
@@ -85,8 +85,8 @@ function PercentDelta({ value }: { value: number | null }) {
     <span
       className={cn(
         "metric-tabular font-semibold",
-        value > 0 && "text-emerald-700",
-        value < 0 && "text-rose-700"
+        value > 0 && "text-emerald-700 dark:text-emerald-300",
+        value < 0 && "text-rose-700 dark:text-rose-300"
       )}
     >
       {formatPercent(value, { signed: true })}
@@ -126,11 +126,11 @@ export function AccountOverviewCard({
   overview: AccountOverview;
 }) {
   const visibleRows = overview.items.slice(0, 6);
-  const legendItems = overview.items.slice(0, 7);
+  const legendItems = overview.items;
 
   return (
-    <Card className="grid gap-0 overflow-hidden p-0 xl:grid-cols-[minmax(420px,0.9fr)_minmax(0,1.35fr)]">
-      <section className="min-w-0 border-border/70 p-5 xl:border-r">
+    <Card className="grid gap-0 overflow-hidden p-0 2xl:grid-cols-[minmax(520px,0.9fr)_minmax(720px,1.35fr)]">
+      <section className="min-w-0 border-border/70 p-5 2xl:border-r">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">
             Account overview
@@ -138,14 +138,14 @@ export function AccountOverviewCard({
           <span className="subtle-chip">All portfolios</span>
         </div>
 
-        <div className="mt-6 grid gap-5 lg:grid-cols-[240px_1fr] xl:grid-cols-1 2xl:grid-cols-[250px_1fr]">
+        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(220px,260px)_minmax(190px,1fr)] 2xl:grid-cols-[minmax(220px,250px)_minmax(190px,1fr)]">
           <div className="relative mx-auto size-[15.5rem] max-w-full">
             <div
               className="absolute inset-0 rounded-full shadow-[inset_0_8px_24px_rgba(12,92,58,0.14)]"
               style={{ background: donutBackground(overview.items) }}
               aria-hidden="true"
             />
-            <div className="absolute inset-[28%] flex flex-col items-center justify-center rounded-full bg-white text-center shadow-[0_10px_32px_rgba(15,35,34,0.08)]">
+            <div className="absolute inset-[28%] flex flex-col items-center justify-center rounded-full bg-card text-center shadow-[0_10px_32px_rgba(15,35,34,0.08)]">
               <span className="text-xs text-muted-foreground">Total value</span>
               <span className="mt-1 text-lg font-semibold metric-tabular">
                 {formatCurrency(overview.totalValue, overview.currency)}
@@ -153,11 +153,11 @@ export function AccountOverviewCard({
             </div>
           </div>
 
-          <div className="min-w-0 space-y-2.5">
+          <div className="min-w-0 space-y-2.5 overflow-y-auto pr-1 2xl:max-h-[22rem]">
             {legendItems.map((item, index) => (
               <div
                 key={`${item.kind}-${item.symbol}`}
-                className="grid min-w-0 grid-cols-[12px_minmax(0,1fr)_minmax(82px,auto)] items-center gap-2 text-sm"
+                className="grid min-w-0 grid-cols-[12px_minmax(0,1fr)_minmax(96px,auto)] items-center gap-2 text-sm"
               >
                 <span
                   className="size-2.5 rounded-full"
@@ -180,13 +180,6 @@ export function AccountOverviewCard({
           </div>
         </div>
 
-        <div className="mt-6 rounded-3xl border border-primary/15 bg-primary/10 p-4">
-          <p className="font-medium">Whole investment account overview</p>
-          <p className="mt-1 text-xs leading-5 text-muted-foreground">
-            Includes holdings and free cash from all portfolios. Cash uses the
-            latest broker snapshot or manual override where available.
-          </p>
-        </div>
       </section>
 
       <section className="min-w-0 p-5">
@@ -201,7 +194,7 @@ export function AccountOverviewCard({
           {visibleRows.map((item, index) => (
             <div
               key={`${item.kind}-${item.symbol}-mobile`}
-              className="rounded-2xl border border-border/70 bg-white p-4 shadow-sm"
+              className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -221,7 +214,7 @@ export function AccountOverviewCard({
                 </div>
               </div>
               <div className="mt-4 flex items-center gap-3">
-                <span className="metric-tabular text-sm font-semibold text-emerald-800">
+                <span className="metric-tabular text-sm font-semibold text-emerald-800 dark:text-emerald-300">
                   {formatPercent(item.allocation)}
                 </span>
                 <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
@@ -235,17 +228,17 @@ export function AccountOverviewCard({
           ))}
         </div>
 
-        <div className="mt-5 hidden overflow-x-auto md:block">
+        <div className="mt-5 hidden md:block">
           <table className="w-full table-fixed text-sm">
             <thead>
               <tr className="border-b border-border/70 text-left text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                <th className="w-[38%] py-3 pr-3">Asset</th>
-                <th className="w-[27%] px-3 py-3">Allocation</th>
-                <th className="w-[20%] px-3 py-3 text-right">Value</th>
-                <th className="hidden px-3 py-3 text-right 2xl:table-cell">
+                <th className="w-[34%] py-3 pr-3">Asset</th>
+                <th className="w-[30%] px-3 py-3">Allocation</th>
+                <th className="w-[16%] px-3 py-3 text-right">Value</th>
+                <th className="w-[10%] px-3 py-3 text-right">
                   P/L ({overview.currency})
                 </th>
-                <th className="w-[15%] px-3 py-3 text-right">P/L (%)</th>
+                <th className="w-[10%] py-3 pl-3 text-right">P/L (%)</th>
               </tr>
             </thead>
             <tbody>
@@ -267,7 +260,7 @@ export function AccountOverviewCard({
                   </td>
                   <td className="px-3 py-3">
                     <div className="flex min-w-32 items-center gap-3">
-                      <span className="metric-tabular font-semibold text-emerald-800">
+                      <span className="metric-tabular font-semibold text-emerald-800 dark:text-emerald-300">
                         {formatPercent(item.allocation)}
                       </span>
                       <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
@@ -281,13 +274,13 @@ export function AccountOverviewCard({
                   <td className="px-3 py-3 text-right metric-tabular font-semibold">
                     {formatCurrency(item.marketValue, overview.currency)}
                   </td>
-                  <td className="hidden px-3 py-3 text-right 2xl:table-cell">
+                  <td className="px-3 py-3 text-right">
                     <MoneyDelta
                       value={item.unrealizedPl}
                       currency={overview.currency}
                     />
                   </td>
-                  <td className="px-3 py-3 text-right">
+                  <td className="py-3 pl-3 text-right">
                     <PercentDelta value={item.plPercent} />
                   </td>
                 </tr>

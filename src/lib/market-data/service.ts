@@ -24,13 +24,18 @@ const TTL_MS: Record<MarketDataType, number> = {
   fundamentals: 24 * 60 * 60 * 1000,
 };
 
+type MarketDataServiceOptions = {
+  quoteTtlMs?: number;
+};
+
 function withExpiry<T>(
   key: string,
   dataType: MarketDataType,
   currency: CurrencyCode,
   provider: string,
   payload: T,
-  fetchedAt: string
+  fetchedAt: string,
+  ttlMs = TTL_MS[dataType]
 ): CachedMarketData<T> {
   return {
     key,
@@ -39,7 +44,7 @@ function withExpiry<T>(
     provider,
     payload,
     fetchedAt,
-    expiresAt: new Date(new Date(fetchedAt).getTime() + TTL_MS[dataType]).toISOString(),
+    expiresAt: new Date(new Date(fetchedAt).getTime() + ttlMs).toISOString(),
   };
 }
 
@@ -50,7 +55,8 @@ function isFresh(entry: CachedMarketData<unknown> | null) {
 export class MarketDataService {
   constructor(
     private cache: MarketDataCache,
-    private providers: MarketDataProvider[] = createConfiguredProviders()
+    private providers: MarketDataProvider[] = createConfiguredProviders(),
+    private options: MarketDataServiceOptions = {}
   ) {}
 
   async getQuote(symbol: string): Promise<MarketQuote | null> {
@@ -80,7 +86,8 @@ export class MarketDataService {
               normalizedQuote.currency,
               normalizedQuote.provider,
               normalizedQuote,
-              normalizedQuote.fetchedAt
+              normalizedQuote.fetchedAt,
+              this.options.quoteTtlMs
             )
           );
           return normalizedQuote;

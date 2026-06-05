@@ -28,6 +28,7 @@ const DEFAULT_MARKET_SETTINGS: MarketDataSettings = {
   livePricesEnabled: false,
   valuationMode: "import_snapshot",
   preferredProvider: "auto",
+  quoteRefreshIntervalSeconds: 120,
 };
 
 async function createDefaultWorkspace(
@@ -136,15 +137,21 @@ function latestSnapshotCash(
 }
 
 function mapHolding(row: Record<string, unknown>): Holding {
+  const symbol = String(row.symbol ?? "");
+  const rowCurrency = String(row.currency ?? "RON");
+  const priceCurrency = symbol.toUpperCase().endsWith(".US")
+    ? "USD"
+    : rowCurrency;
+
   return {
     id: String(row.id),
     portfolioId: String(row.portfolio_id),
-    symbol: String(row.symbol ?? ""),
+    symbol,
     companyName: row.company_name ? String(row.company_name) : null,
     quantity: numberFrom(row.quantity),
     averageCost: numberFrom(row.average_cost),
     currentPrice: numberFrom(row.current_price),
-    currency: String(row.currency ?? "RON"),
+    currency: priceCurrency,
     marketValue: numberFrom(row.market_value),
     costBasis: numberFrom(row.cost_basis),
     realizedPl: numberFrom(row.realized_pl),
@@ -215,6 +222,10 @@ function mapMarketDataSettings(row?: Record<string, unknown> | null): MarketData
     ].includes(String(row.preferred_provider))
       ? (String(row.preferred_provider) as MarketDataSettings["preferredProvider"])
       : "auto",
+    quoteRefreshIntervalSeconds:
+      numberFrom(row.quote_refresh_interval_seconds, 120) >= 60
+        ? Math.min(numberFrom(row.quote_refresh_interval_seconds, 120), 3600)
+        : 120,
   };
 }
 
@@ -350,7 +361,8 @@ function applyLiveValuation(input: {
 
     return {
       ...holding,
-      currentPrice: round(convertedPrice, 4),
+      currentPrice: round(quotePrice, 4),
+      currency: quoteCurrency.toUpperCase(),
       marketValue,
       unrealizedPl: round(marketValue - holding.costBasis, 2),
       updatedAt: String(quoteRow.fetched_at ?? quoteRow.as_of ?? holding.updatedAt),

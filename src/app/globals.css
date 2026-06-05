@@ -130,8 +130,30 @@
       linear-gradient(to bottom, oklch(1 0 0), var(--background) 24rem);
     min-height: 100vh;
   }
+  .dark body {
+    background-image:
+      radial-gradient(circle at 82% 5%, color-mix(in oklch, var(--primary), transparent 88%), transparent 32rem),
+      linear-gradient(to bottom, oklch(0.15 0.028 190), var(--background) 24rem);
+  }
   html {
     @apply font-sans;
+  }
+  html,
+  body,
+  button,
+  input,
+  textarea,
+  select,
+  [data-slot],
+  .premium-card,
+  .premium-panel,
+  .subtle-chip {
+    transition:
+      background-color 260ms ease,
+      border-color 260ms ease,
+      color 260ms ease,
+      box-shadow 260ms ease,
+      opacity 260ms ease;
   }
 }
 
@@ -145,7 +167,7 @@
   }
 
   .premium-panel {
-    @apply rounded-3xl border border-border/70 bg-white/78 shadow-[0_14px_45px_rgba(15,35,34,0.06)] backdrop-blur-sm;
+    @apply rounded-3xl border border-border/70 bg-card/80 shadow-[0_14px_45px_rgba(15,35,34,0.06)] backdrop-blur-sm;
   }
 
   .soft-green-icon {
@@ -153,6 +175,6 @@
   }
 
   .subtle-chip {
-    @apply rounded-full border border-border/70 bg-white/80 px-3 py-1 text-xs text-muted-foreground shadow-sm;
+    @apply rounded-full border border-border/70 bg-card/80 px-3 py-1 text-xs text-muted-foreground shadow-sm;
   }
 }

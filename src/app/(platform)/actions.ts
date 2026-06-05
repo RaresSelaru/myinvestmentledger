@@ -407,6 +407,7 @@ export async function updateMarketDataSettingsAction(formData: FormData) {
     livePricesEnabled: formData.get("livePricesEnabled") === "on",
     valuationMode: formData.get("valuationMode"),
     preferredProvider: formData.get("preferredProvider"),
+    quoteRefreshIntervalSeconds: formData.get("quoteRefreshIntervalSeconds"),
   });
 
   if (!parsed.success) {
@@ -422,6 +423,8 @@ export async function updateMarketDataSettingsAction(formData: FormData) {
         live_prices_enabled: parsed.data.livePricesEnabled,
         valuation_mode: parsed.data.valuationMode,
         preferred_provider: parsed.data.preferredProvider,
+        quote_refresh_interval_seconds:
+          parsed.data.quoteRefreshIntervalSeconds,
       },
       { onConflict: "user_id,portfolio_id" }
     );
@@ -542,7 +545,7 @@ export async function refreshPortfolioQuotesAction(formData: FormData) {
       await Promise.all([
         supabase
           .from("market_data_settings")
-          .select("preferred_provider")
+          .select("preferred_provider, quote_refresh_interval_seconds")
           .eq("user_id", user.id)
           .eq("portfolio_id", parsed.data.portfolioId)
           .limit(1),
@@ -560,6 +563,13 @@ export async function refreshPortfolioQuotesAction(formData: FormData) {
       ]);
     const preferredProvider = String(
       settingRows?.[0]?.preferred_provider ?? "auto"
+    );
+    const quoteRefreshIntervalSeconds = Math.min(
+      3600,
+      Math.max(
+        60,
+        Number(settingRows?.[0]?.quote_refresh_interval_seconds ?? 120)
+      )
     );
     const providers = await configuredMarketProviders(
       supabase,
@@ -581,7 +591,8 @@ export async function refreshPortfolioQuotesAction(formData: FormData) {
 
     const service = new MarketDataService(
       new SupabaseMarketDataCache(supabase, user.id),
-      providers
+      providers,
+      { quoteTtlMs: quoteRefreshIntervalSeconds * 1000 }
     );
     const quotes = (await service.refreshMarketData(symbols)).filter(
       Boolean

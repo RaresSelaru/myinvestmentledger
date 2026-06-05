@@ -30,7 +30,7 @@ export function CandidateCard({
         {candidates.length ? (
           candidates.map((candidate) => (
             <Sheet key={`${candidate.kind}-${candidate.symbol}`}>
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-white px-4 py-3.5 transition-colors hover:bg-accent/35">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card px-4 py-3.5 transition-colors hover:bg-accent/35">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="font-medium">{candidate.symbol}</p>
@@ -92,7 +92,7 @@ export function CandidateCard({
             </Sheet>
           ))
         ) : (
-          <p className="rounded-2xl border border-dashed border-border/80 bg-white/70 px-3 py-8 text-center text-sm text-muted-foreground">
+          <p className="rounded-2xl border border-dashed border-border/80 bg-card/70 px-3 py-8 text-center text-sm text-muted-foreground">
             No candidates from current data.
           </p>
         )}

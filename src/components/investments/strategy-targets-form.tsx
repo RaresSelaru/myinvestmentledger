@@ -92,7 +92,7 @@ export function StrategyTargetsForm({
 
   if (!holdings.length) {
     return (
-      <p className="rounded-3xl border border-dashed border-primary/25 bg-white px-4 py-12 text-center text-sm text-muted-foreground">
+      <p className="rounded-3xl border border-dashed border-primary/25 bg-card px-4 py-12 text-center text-sm text-muted-foreground">
         Import an XTB report first, then tune targets and core/satellite splits here.
       </p>
     );
@@ -111,7 +111,7 @@ export function StrategyTargetsForm({
             <span
               className={cn(
                 "metric-tabular font-semibold",
-                totalTarget > 100 ? "text-rose-700" : "text-emerald-700"
+                totalTarget > 100 ? "text-rose-700 dark:text-rose-300" : "text-emerald-700 dark:text-emerald-300"
               )}
             >
               {totalTarget.toFixed(1)}%
@@ -128,7 +128,7 @@ export function StrategyTargetsForm({
         {drafts.map((draft, index) => (
           <div
             key={draft.symbol}
-            className="grid gap-4 rounded-3xl border border-border/70 bg-white p-5 shadow-sm md:grid-cols-2 2xl:grid-cols-[140px_repeat(4,minmax(0,1fr))_260px]"
+            className="grid gap-4 rounded-3xl border border-border/70 bg-card p-5 shadow-sm md:grid-cols-2 2xl:grid-cols-[140px_repeat(4,minmax(0,1fr))_260px]"
           >
             <div className="min-w-0 md:col-span-2 2xl:col-span-1">
               <p className="font-semibold">{draft.symbol}</p>

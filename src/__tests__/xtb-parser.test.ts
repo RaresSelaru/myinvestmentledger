@@ -37,7 +37,7 @@ describe("XTB workbook parser", () => {
     const firstClosed = parsed.rows.find((row) => row.kind === "closed_positions");
 
     expect(firstOpen?.positionLot?.symbol).toBe("LEU.US");
-    expect(firstOpen?.positionLot?.currency).toBe("RON");
+    expect(firstOpen?.positionLot?.currency).toBe("USD");
     expect(firstOpen?.positionLot?.sourceFingerprint).toContain("xtb:broker-1:position:");
     expect(firstCash?.cashOperation?.normalizedType).toBe("tax");
     expect(firstCash?.sourceFingerprint).toContain("xtb:broker-1:cash:");

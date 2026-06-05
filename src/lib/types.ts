@@ -130,6 +130,7 @@ export type MarketDataSettings = {
   livePricesEnabled: boolean;
   valuationMode: ValuationMode;
   preferredProvider: MarketDataProviderName | "auto";
+  quoteRefreshIntervalSeconds: number;
 };
 
 export type MarketDataApiKeyStatus = {

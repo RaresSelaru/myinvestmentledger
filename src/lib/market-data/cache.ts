@@ -31,21 +31,22 @@ export class SupabaseMarketDataCache implements MarketDataCache {
     const table = this.supabase.from("market_data_cache") as {
       select: (columns: string) => unknown;
     };
-    const query = table.select("*") as {
-      eq: (column: string, value: unknown) => unknown;
+    type Query = {
+      eq: (column: string, value: unknown) => Query;
+      order: (column: string, options: Record<string, unknown>) => Query;
+      limit: (
+        count: number
+      ) => Promise<{ data: Array<Record<string, unknown>> | null }>;
     };
-    const result = await (query
-      .eq("user_id", this.userId) as {
-      eq: (column: string, value: unknown) => unknown;
-    })
-      .eq("symbol", key.toUpperCase()) as {
-      eq: (column: string, value: unknown) => unknown;
-    };
-
-    const finalResult = await (result.eq("data_type", dataType) as {
-      eq: (column: string, value: unknown) => Promise<{ data: Array<Record<string, unknown>> | null }>;
-    }).eq("currency", currency.toUpperCase());
-    const row = finalResult.data?.[0];
+    const query = table.select("*") as Query;
+    const result = await query
+      .eq("user_id", this.userId)
+      .eq("symbol", key.toUpperCase())
+      .eq("data_type", dataType)
+      .eq("currency", currency.toUpperCase())
+      .order("fetched_at", { ascending: false })
+      .limit(1);
+    const row = result.data?.[0];
 
     if (!row) {
       return null;

@@ -1,6 +1,5 @@
 import { commitStagedImportAction, dryRunImportAction } from "@/app/(platform)/actions";
 import { ImportReportForm } from "@/components/investments/import-report-form";
-import { PageHeader } from "@/components/investments/page-header";
 import { getWorkspaceShellData } from "@/lib/data";
 
 type ImportsPageProps = {
@@ -17,11 +16,6 @@ export default async function ImportsPage({ searchParams }: ImportsPageProps) {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Imports"
-        description="Upload XTB Excel reports and keep broker source files private."
-      />
-
       <ImportReportForm
         portfolio={workspace.activePortfolio}
         brokerAccounts={workspace.brokerAccounts}

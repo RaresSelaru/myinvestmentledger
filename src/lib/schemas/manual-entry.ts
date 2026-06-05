@@ -117,6 +117,7 @@ export const marketDataSettingsSchema = z.object({
     "alpha_vantage",
     "twelve_data",
   ]),
+  quoteRefreshIntervalSeconds: z.coerce.number().int().min(60).max(3600),
 });
 
 export const marketDataApiKeySchema = z.object({

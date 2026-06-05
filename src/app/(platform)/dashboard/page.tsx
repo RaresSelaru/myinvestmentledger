@@ -17,18 +17,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="subtle-chip">
-          Valuation: {summary.valuationSource ?? "XTB snapshot"}
-        </span>
-        <span className="subtle-chip">
-          Cash: {summary.cashSource ?? "Broker cash snapshot"}
-        </span>
-        <span className="subtle-chip">
-          Updated: {summary.updatedAt}
-        </span>
-      </div>
-
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <MetricCard
           label="Total portfolio value"
@@ -109,6 +97,11 @@ export default async function DashboardPage() {
               candidates={workspace.trimmingCandidates}
             />
           </section>
+          <div className="ml-auto max-w-xl rounded-2xl border border-primary/15 bg-primary/8 px-4 py-3 text-xs leading-5 text-muted-foreground">
+            Whole investment account overview: includes holdings and free cash
+            from all portfolios. Cash uses the latest broker snapshot or manual
+            override where available.
+          </div>
         </>
       ) : (
         <EmptyState

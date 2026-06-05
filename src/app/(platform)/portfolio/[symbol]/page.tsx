@@ -6,7 +6,6 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { CoreSatelliteBar } from "@/components/investments/core-satellite-bar";
 import { ExplainNumber } from "@/components/investments/explain-number";
-import { PageHeader } from "@/components/investments/page-header";
 import { SignedPercent } from "@/components/investments/signed-value";
 import { getStockDetailData } from "@/lib/data";
 import {
@@ -79,11 +78,6 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
           Portfolio
         </Link>
       </Button>
-
-      <PageHeader
-        title={holding.symbol}
-        description={holding.companyName ?? "Position detail"}
-      />
 
       <section className="grid gap-4 lg:grid-cols-4">
         <Metric label="Market value" value={formatCurrency(holding.marketValue, workspace.summary.currency)} />
@@ -212,7 +206,7 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
             transactions.map((transaction) => (
               <div
                 key={transaction.id}
-                className="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-white px-4 py-3 text-sm shadow-sm"
+                className="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-card px-4 py-3 text-sm shadow-sm"
               >
                 <span>{transaction.date}</span>
                 <span className="text-muted-foreground">
@@ -242,7 +236,7 @@ function Metric({
   value: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-border/70 bg-white p-4 shadow-sm">
+    <div className="rounded-2xl border border-border/70 bg-card p-4 shadow-sm">
       <p className="text-xs text-muted-foreground">{label}</p>
       <div className="mt-1 metric-tabular font-medium">{value}</div>
     </div>

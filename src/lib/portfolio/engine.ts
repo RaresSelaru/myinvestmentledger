@@ -161,7 +161,7 @@ export function computePortfolioState({
         quantity: 0,
         averageCost: 0,
         currentPrice: lot.currentPrice ?? lot.openPrice,
-        currency: baseCurrency,
+        currency: lot.currency,
         marketValue: 0,
         costBasis: 0,
         realizedPl: realizedPlBySymbol[symbol] ?? 0,
@@ -176,13 +176,16 @@ export function computePortfolioState({
         sourceReferences: [],
       } satisfies Holding);
 
+    const previousQuantity = existing.quantity;
+    const previousAverageCost = existing.averageCost;
     existing.quantity += lot.quantity;
     existing.marketValue += marketValueBase;
     existing.costBasis += costBasisBase;
     existing.unrealizedPl += unrealizedBase;
     existing.sourceReferences?.push(lot.sourceReference ?? {});
     existing.averageCost = existing.quantity
-      ? existing.costBasis / existing.quantity
+      ? (previousAverageCost * previousQuantity + lot.openPrice * lot.quantity) /
+        existing.quantity
       : 0;
     existing.currentPrice = lot.currentPrice ?? existing.currentPrice;
     grouped.set(symbol, existing);

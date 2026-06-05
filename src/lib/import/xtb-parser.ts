@@ -561,6 +561,9 @@ function normalizeOpenPositionRow(
   accountCurrency: CurrencyCode
 ): ParsedXtbRow {
   const symbol = normalizeSymbol(read(row, headers, "symbol")) ?? "";
+  const instrumentCurrency = symbol.toUpperCase().endsWith(".US")
+    ? "USD"
+    : accountCurrency;
   const quantity = parseNumber(read(row, headers, "volume")) ?? 0;
   const openPrice = parseNumber(read(row, headers, "openPrice")) ?? 0;
   const currentPrice = parseNumber(read(row, headers, "marketPrice"));
@@ -579,7 +582,7 @@ function normalizeOpenPositionRow(
     costBasis,
     marketValue,
     unrealizedPl,
-    currency: accountCurrency,
+    currency: instrumentCurrency,
     openedAt,
     sourceFingerprint: base.sourceFingerprint,
     sourceReference,

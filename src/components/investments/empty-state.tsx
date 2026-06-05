@@ -12,7 +12,7 @@ export function EmptyState({
   isLocked?: boolean;
 }) {
   return (
-    <div className="flex min-h-80 flex-col items-center justify-center rounded-3xl border border-dashed border-primary/25 bg-white px-6 py-12 text-center shadow-[0_18px_55px_rgba(15,35,34,0.06)]">
+    <div className="flex min-h-80 flex-col items-center justify-center rounded-3xl border border-dashed border-primary/25 bg-card px-6 py-12 text-center shadow-[0_18px_55px_rgba(15,35,34,0.06)]">
       <div className="soft-green-icon size-14">
         <ArrowDownToLine className="size-5" aria-hidden="true" />
       </div>

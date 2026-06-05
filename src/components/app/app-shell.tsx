@@ -190,7 +190,7 @@ export function AppShell({
       </aside>
 
       <div className="lg:pl-[19rem]">
-        <header className="sticky top-0 z-30 border-b border-border/70 bg-white/82 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 border-b border-border/70 bg-card/82 backdrop-blur-xl">
           <div className="flex min-h-24 items-center gap-3 px-4 sm:px-6 lg:px-9">
             <Sheet>
               <SheetTrigger asChild>

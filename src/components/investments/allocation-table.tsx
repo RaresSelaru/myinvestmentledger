@@ -215,7 +215,7 @@ export function AllocationTable({
 
 function Detail({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-1 rounded-2xl bg-white/70 p-3 ring-1 ring-border/60">
+    <div className="space-y-1 rounded-2xl bg-card/70 p-3 ring-1 ring-border/60">
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="metric-tabular font-medium">{value}</p>
     </div>

@@ -46,7 +46,7 @@ export function PortfolioSelector({
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          className="h-14 min-w-0 justify-between gap-4 rounded-2xl bg-white px-4 shadow-[0_10px_28px_rgba(15,35,34,0.06)] sm:min-w-72"
+          className="h-14 min-w-0 justify-between gap-4 rounded-2xl bg-card px-4 shadow-[0_10px_28px_rgba(15,35,34,0.06)] sm:min-w-72"
         >
           <span className="min-w-0 text-left">
             <span className="block truncate font-medium">

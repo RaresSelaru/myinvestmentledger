@@ -61,7 +61,12 @@ function detail(transaction: Transaction) {
   }
 
   if (transaction.price !== null) {
-    pieces.push(`${formatMoneyPrecise(transaction.price, transaction.currency)} price`);
+    pieces.push(
+      `${formatMoneyPrecise(
+        transaction.price,
+        transaction.symbol?.endsWith(".US") ? "USD" : transaction.currency
+      )} price`
+    );
   }
 
   if (transaction.realizedPl !== null && transaction.realizedPl !== undefined) {
@@ -111,7 +116,7 @@ export function TransactionsTable({
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-col gap-3 rounded-3xl border border-border/70 bg-white p-3 shadow-[0_14px_45px_rgba(15,35,34,0.06)] sm:flex-row">
+      <div className="flex flex-col gap-3 rounded-3xl border border-border/70 bg-card p-3 shadow-[0_14px_45px_rgba(15,35,34,0.06)] sm:flex-row">
         <div className="relative min-w-0 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -137,16 +142,16 @@ export function TransactionsTable({
       </div>
 
       <div className="overflow-hidden rounded-3xl border border-border/70 bg-card shadow-[0_18px_55px_rgba(15,35,34,0.08)]">
-        <div className="overflow-x-auto">
-          <Table>
+        <div className="overflow-hidden">
+          <Table className="table-fixed" containerClassName="overflow-hidden">
             <TableHeader>
               <TableRow className="bg-muted/35 hover:bg-muted/35">
-                <TableHead>Date</TableHead>
-                <TableHead>Event</TableHead>
-                <TableHead>Symbol</TableHead>
-                <TableHead>Details</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Source</TableHead>
+                <TableHead className="w-[16%]">Date</TableHead>
+                <TableHead className="w-[12%]">Event</TableHead>
+                <TableHead className="w-[12%]">Symbol</TableHead>
+                <TableHead className="w-[32%]">Details</TableHead>
+                <TableHead className="w-[16%] text-right">Amount</TableHead>
+                <TableHead className="w-[10%]">Source</TableHead>
                 <TableHead className="w-10" />
               </TableRow>
             </TableHeader>
@@ -171,23 +176,23 @@ export function TransactionsTable({
                           }
                         }}
                       >
-                        <TableCell className="metric-tabular whitespace-nowrap">
+                        <TableCell className="metric-tabular whitespace-normal text-xs leading-5">
                           {formatDateTime(transaction.date)}
                         </TableCell>
                         <TableCell>{eventLabel(transaction)}</TableCell>
                         <TableCell className="font-medium">
                           {transaction.symbol ?? "-"}
                         </TableCell>
-                        <TableCell className="max-w-md truncate text-muted-foreground">
+                        <TableCell className="whitespace-normal text-muted-foreground">
                           {detail(transaction)}
                         </TableCell>
                         <TableCell
                           className={cn(
                             "text-right metric-tabular",
                             transaction.amount < 0
-                              ? "text-rose-700"
+                              ? "text-rose-700 dark:text-rose-300"
                               : transaction.amount > 0
-                                ? "text-emerald-700"
+                                ? "text-emerald-700 dark:text-emerald-300"
                                 : ""
                           )}
                         >
@@ -217,20 +222,36 @@ export function TransactionsTable({
                           <TableCell colSpan={7} className="bg-muted/25">
                             <div className="grid gap-3 text-sm md:grid-cols-3">
                               <TraceItem
-                                label="Broker account"
+                                label="Executed"
+                                value={formatDateTime(transaction.date)}
+                              />
+                              <TraceItem
+                                label="Position"
                                 value={
-                                  transaction.brokerAccountId
-                                    ? brokerName.get(transaction.brokerAccountId) ?? "-"
-                                    : "-"
+                                  transaction.quantity !== null || transaction.price !== null
+                                    ? [
+                                        transaction.quantity !== null
+                                          ? `${formatNumber(transaction.quantity, 4)} qty`
+                                          : null,
+                                        transaction.price !== null
+                                          ? `${formatMoneyPrecise(
+                                              transaction.price,
+                                              transaction.symbol?.endsWith(".US")
+                                                ? "USD"
+                                                : transaction.currency
+                                            )} price`
+                                          : null,
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" · ")
+                                    : transaction.brokerAccountId
+                                      ? brokerName.get(transaction.brokerAccountId) ?? "-"
+                                      : "-"
                                 }
                               />
                               <TraceItem
-                                label="Comment"
-                                value={transaction.comment ?? "-"}
-                              />
-                              <TraceItem
-                                label="Source fingerprint"
-                                value={transaction.sourceFingerprint ?? "Manual entry"}
+                                label="Amount"
+                                value={formatMoneyPrecise(transaction.amount, transaction.currency)}
                               />
                             </div>
                           </TableCell>
@@ -259,7 +280,7 @@ export function TransactionsTable({
 
 function TraceItem({ label, value }: { label: string; value: string }) {
   return (
-    <div className="min-w-0 rounded-2xl border border-border/60 bg-white/75 p-3">
+    <div className="min-w-0 rounded-2xl border border-border/60 bg-card p-3">
       <p className="text-xs uppercase tracking-wide text-muted-foreground">
         {label}
       </p>
