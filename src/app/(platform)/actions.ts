@@ -65,6 +65,55 @@ function safeRedirect(value: FormDataEntryValue | null, fallback = "/dashboard")
   return fallback;
 }
 
+function readableError(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const candidate = error as {
+      message?: unknown;
+      details?: unknown;
+      hint?: unknown;
+      code?: unknown;
+    };
+    const parts = [candidate.message, candidate.details, candidate.hint]
+      .filter(
+        (part): part is string =>
+          typeof part === "string" && part.trim().length > 0
+      )
+      .map((part) => part.trim());
+
+    if (parts.length) {
+      return parts.join(" ");
+    }
+
+    if (typeof candidate.code === "string" && candidate.code.trim()) {
+      return `${fallback} (${candidate.code})`;
+    }
+  }
+
+  return fallback;
+}
+
+function isMissingDecisionSchemaError(error: unknown) {
+  const message = readableError(error, "").toLowerCase();
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code?: unknown }).code ?? "")
+      : "";
+
+  return (
+    code === "PGRST204" ||
+    code === "42P01" ||
+    code === "42703" ||
+    message.includes("could not find") ||
+    message.includes("column") ||
+    message.includes("relation") ||
+    message.includes("schema cache")
+  );
+}
+
 function tagList(value: string | undefined) {
   return (value ?? "")
     .split(",")
@@ -93,13 +142,13 @@ async function requireUser(redirectTo = "/login") {
 
 function importFailureUrl(error: unknown) {
   return `/imports?error=${encodeURIComponent(
-    error instanceof Error ? error.message : "Import failed"
+    readableError(error, "Import failed")
   )}`;
 }
 
 function settingsFailureUrl(error: unknown) {
   return `/settings?error=${encodeURIComponent(
-    error instanceof Error ? error.message : "Settings update failed"
+    readableError(error, "Settings update failed")
   )}`;
 }
 
@@ -473,18 +522,29 @@ export async function bulkSaveTargetsAction(formData: FormData) {
       parsed.data.portfolioId
     );
 
-    const payload = parsed.data.targets.map((target) => ({
+    const basePayload = parsed.data.targets.map((target) => ({
       user_id: user.id,
       portfolio_id: parsed.data.portfolioId,
       symbol: target.symbol.toUpperCase(),
       target_allocation: target.targetAllocation,
       max_allocation: target.maxAllocation,
-      target_allocation_pct: target.targetAllocation,
-      max_allocation_pct: target.maxAllocation,
       target_buy_price: target.targetBuyPrice,
       target_sell_price: target.targetSellPrice,
       core_percent: target.corePercent,
       satellite_percent: target.satellitePercent,
+    }));
+    const decisionPayload = parsed.data.targets.map((target) => ({
+      user_id: user.id,
+      portfolio_id: parsed.data.portfolioId,
+      symbol: target.symbol.toUpperCase(),
+      target_allocation: target.targetAllocation,
+      max_allocation: target.maxAllocation,
+      target_buy_price: target.targetBuyPrice,
+      target_sell_price: target.targetSellPrice,
+      core_percent: target.corePercent,
+      satellite_percent: target.satellitePercent,
+      target_allocation_pct: target.targetAllocation,
+      max_allocation_pct: target.maxAllocation,
       core_pct: target.corePercent,
       satellite_pct: target.satellitePercent,
       role: target.role,
@@ -504,11 +564,19 @@ export async function bulkSaveTargetsAction(formData: FormData) {
 
     const { error: targetError } = await supabase
       .from("targets")
-      .upsert(payload, { onConflict: "user_id,portfolio_id,symbol" });
+      .upsert(basePayload, { onConflict: "user_id,portfolio_id,symbol" });
 
     if (targetError) throw targetError;
 
-    for (const target of payload) {
+    const { error: decisionTargetError } = await supabase
+      .from("targets")
+      .upsert(decisionPayload, { onConflict: "user_id,portfolio_id,symbol" });
+
+    if (decisionTargetError && !isMissingDecisionSchemaError(decisionTargetError)) {
+      throw decisionTargetError;
+    }
+
+    for (const target of basePayload) {
       const { error: holdingError } = await supabase
         .from("holdings")
         .update({
@@ -526,17 +594,28 @@ export async function bulkSaveTargetsAction(formData: FormData) {
       if (holdingError) throw holdingError;
     }
 
-    await refreshDecisionReadinessForPortfolio({
-      supabase,
-      userId: user.id,
-      portfolioId: parsed.data.portfolioId,
-      baseCurrency: portfolio.baseCurrency,
-      reason: "strategy_save",
-    });
+    try {
+      await refreshDecisionReadinessForPortfolio({
+        supabase,
+        userId: user.id,
+        portfolioId: parsed.data.portfolioId,
+        baseCurrency: portfolio.baseCurrency,
+        reason: "strategy_save",
+      });
+    } catch (error) {
+      if (!isMissingDecisionSchemaError(error)) {
+        throw error;
+      }
+
+      console.warn(
+        "[strategy] saved base targets but skipped decision recalculation",
+        readableError(error, "Decision schema is not ready")
+      );
+    }
   } catch (error) {
     redirect(
       `/strategy?error=${encodeURIComponent(
-        error instanceof Error ? error.message : "Could not save strategy"
+        readableError(error, "Could not save strategy")
       )}`
     );
   }
