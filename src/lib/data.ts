@@ -4,6 +4,7 @@ import { computePortfolioSummary, enrichHoldings, rankCandidates, round } from "
 import { getPreviewWorkspaceData } from "@/lib/mock-data";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
+  AccountOverview,
   BrokerCashOverride,
   BrokerAccount,
   Holding,
@@ -372,6 +373,93 @@ function applyLiveValuation(input: {
   };
 }
 
+function buildAccountOverview(input: {
+  holdings: Holding[];
+  cash: number;
+  currency: string;
+}): AccountOverview {
+  const bySymbol = new Map<
+    string,
+    {
+      symbol: string;
+      name: string;
+      marketValue: number;
+      costBasis: number;
+      unrealizedPl: number;
+      updatedAt: string;
+    }
+  >();
+
+  for (const holding of input.holdings) {
+    const symbol = holding.symbol.toUpperCase();
+    const current = bySymbol.get(symbol) ?? {
+      symbol,
+      name: holding.companyName ?? symbol,
+      marketValue: 0,
+      costBasis: 0,
+      unrealizedPl: 0,
+      updatedAt: holding.updatedAt,
+    };
+
+    current.name = current.name === symbol && holding.companyName
+      ? holding.companyName
+      : current.name;
+    current.marketValue += holding.marketValue;
+    current.costBasis += holding.costBasis;
+    current.unrealizedPl += holding.unrealizedPl;
+    current.updatedAt =
+      String(holding.updatedAt).localeCompare(current.updatedAt) > 0
+        ? holding.updatedAt
+        : current.updatedAt;
+    bySymbol.set(symbol, current);
+  }
+
+  const holdingsValue = Array.from(bySymbol.values()).reduce(
+    (total, item) => total + item.marketValue,
+    0
+  );
+  const totalValue = round(holdingsValue + input.cash, 2);
+  const holdingItems = Array.from(bySymbol.values())
+    .map((item) => ({
+      kind: "holding" as const,
+      symbol: item.symbol,
+      name: item.name,
+      marketValue: round(item.marketValue, 2),
+      allocation: totalValue ? round((item.marketValue / totalValue) * 100, 2) : 0,
+      unrealizedPl: round(item.unrealizedPl, 2),
+      plPercent: item.costBasis
+        ? round((item.unrealizedPl / item.costBasis) * 100, 2)
+        : 0,
+      currency: input.currency,
+    }))
+    .sort((a, b) => b.marketValue - a.marketValue);
+
+  const cashItem = {
+    kind: "cash" as const,
+    symbol: "CASH",
+    name: "Free cash",
+    marketValue: round(input.cash, 2),
+    allocation: totalValue ? round((input.cash / totalValue) * 100, 2) : 0,
+    unrealizedPl: null,
+    plPercent: null,
+    currency: input.currency,
+  };
+  const updatedAt =
+    Array.from(bySymbol.values())
+      .map((item) => item.updatedAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1) ?? "Not available";
+
+  return {
+    totalValue,
+    totalCash: round(input.cash, 2),
+    currency: input.currency,
+    updatedAt,
+    items: [...holdingItems, cashItem].sort((a, b) => b.marketValue - a.marketValue),
+  };
+}
+
 function previewShell(): WorkspaceShellData {
   const preview = getPreviewWorkspaceData();
 
@@ -518,6 +606,9 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
     { data: settingsRows },
     { data: cashOverrideRows },
     { data: marketRows },
+    { data: allHoldingRows },
+    { data: allSnapshotRows },
+    { data: allCashOverrideRows },
   ] = await Promise.all([
     base.supabase
       .from("holdings")
@@ -560,6 +651,20 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
       .select("*")
       .eq("user_id", base.userId)
       .in("data_type", ["quote", "fx"]),
+    base.supabase
+      .from("holdings")
+      .select("*")
+      .eq("user_id", base.userId)
+      .order("symbol", { ascending: true }),
+    base.supabase
+      .from("broker_account_snapshots")
+      .select("*")
+      .eq("user_id", base.userId)
+      .order("snapshot_at", { ascending: false }),
+    base.supabase
+      .from("broker_cash_overrides")
+      .select("*")
+      .eq("user_id", base.userId),
   ]);
 
   const marketDataSettings = mapMarketDataSettings(
@@ -608,6 +713,27 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
         : "Broker cash snapshot";
   summary.dataStatus = valuation.status;
   const holdings = enrichHoldings(valuation.holdings, summary.totalValue);
+  const allRawHoldings = (allHoldingRows ?? []).map((row) =>
+    mapHolding(row as Record<string, unknown>)
+  );
+  const allCashOverrides = (allCashOverrideRows ?? []).map((row) =>
+    mapCashOverride(row as Record<string, unknown>)
+  );
+  const accountCash = latestSnapshotCash(
+    (allSnapshotRows ?? []) as Record<string, unknown>[],
+    allCashOverrides
+  );
+  const accountValuation = applyLiveValuation({
+    holdings: allRawHoldings,
+    marketRows: (marketRows ?? []) as Record<string, unknown>[],
+    baseCurrency: base.activePortfolio.baseCurrency,
+    settings: marketDataSettings,
+  });
+  const accountOverview = buildAccountOverview({
+    holdings: accountValuation.holdings,
+    cash: accountCash ?? 0,
+    currency: base.activePortfolio.baseCurrency,
+  });
 
   return {
     isPreview: base.isPreview,
@@ -619,6 +745,7 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
     holdings,
     transactions: visibleTransactions,
     summary,
+    accountOverview,
     marketDataSettings,
     accumulationCandidates: rankCandidates(holdings, "accumulation"),
     trimmingCandidates: rankCandidates(holdings, "trimming"),

@@ -105,6 +105,27 @@ export type PortfolioSummary = {
   dataStatus?: "snapshot" | "live" | "stale" | "partial";
 };
 
+export type AccountOverviewItemKind = "holding" | "cash";
+
+export type AccountOverviewItem = {
+  kind: AccountOverviewItemKind;
+  symbol: string;
+  name: string;
+  marketValue: number;
+  allocation: number;
+  unrealizedPl: number | null;
+  plPercent: number | null;
+  currency: CurrencyCode;
+};
+
+export type AccountOverview = {
+  totalValue: number;
+  totalCash: number;
+  currency: CurrencyCode;
+  updatedAt: string;
+  items: AccountOverviewItem[];
+};
+
 export type MarketDataSettings = {
   livePricesEnabled: boolean;
   valuationMode: ValuationMode;
@@ -204,6 +225,7 @@ export type WorkspaceData = {
   holdings: HoldingView[];
   transactions: Transaction[];
   summary: PortfolioSummary;
+  accountOverview: AccountOverview;
   marketDataSettings?: MarketDataSettings;
   accumulationCandidates: Candidate[];
   trimmingCandidates: Candidate[];

@@ -1,5 +1,5 @@
 import { Banknote, Layers3, LineChart, Target, Wallet } from "lucide-react";
-import { AllocationTable } from "@/components/investments/allocation-table";
+import { AccountOverviewCard } from "@/components/investments/account-overview-card";
 import { CandidateCard } from "@/components/investments/candidate-card";
 import { EmptyState } from "@/components/investments/empty-state";
 import { ExplainNumber } from "@/components/investments/explain-number";
@@ -101,20 +101,9 @@ export default async function DashboardPage() {
         />
       </section>
 
-      {workspace.holdings.length ? (
+      {workspace.accountOverview.totalValue > 0 || workspace.holdings.length ? (
         <>
-          <section>
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold tracking-tight">
-                Allocation by symbol
-              </h2>
-            </div>
-            <AllocationTable
-              holdings={workspace.holdings}
-              transactions={workspace.transactions}
-              currency={summary.currency}
-            />
-          </section>
+          <AccountOverviewCard overview={workspace.accountOverview} />
 
           <section className="grid gap-4 lg:grid-cols-2">
             <CandidateCard

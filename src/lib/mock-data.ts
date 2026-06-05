@@ -169,6 +169,36 @@ export function getPreviewWorkspaceData(): WorkspaceData {
     portfolio.baseCurrency
   );
   const holdings = enrichHoldings(previewHoldings, summary.totalValue);
+  const accountOverview = {
+    totalValue: summary.totalValue,
+    totalCash: summary.cash,
+    currency: summary.currency,
+    updatedAt: summary.updatedAt,
+    items: [
+      ...holdings.map((holding) => ({
+        kind: "holding" as const,
+        symbol: holding.symbol,
+        name: holding.companyName ?? holding.symbol,
+        marketValue: holding.marketValue,
+        allocation: holding.actualAllocation,
+        unrealizedPl: holding.unrealizedPl,
+        plPercent: holding.plPercent,
+        currency: summary.currency,
+      })),
+      {
+        kind: "cash" as const,
+        symbol: "CASH",
+        name: "Free cash",
+        marketValue: summary.cash,
+        allocation: summary.totalValue
+          ? (summary.cash / summary.totalValue) * 100
+          : 0,
+        unrealizedPl: null,
+        plPercent: null,
+        currency: summary.currency,
+      },
+    ].sort((a, b) => b.marketValue - a.marketValue),
+  };
 
   return {
     isPreview: true,
@@ -180,6 +210,7 @@ export function getPreviewWorkspaceData(): WorkspaceData {
     holdings,
     transactions: previewTransactions,
     summary,
+    accountOverview,
     accumulationCandidates: rankCandidates(holdings, "accumulation"),
     trimmingCandidates: rankCandidates(holdings, "trimming"),
   };
