@@ -91,6 +91,10 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
                     Uses cached quotes for holdings. Cash remains from broker snapshot
                     or manual override.
                   </span>
+                  <span className="mt-2 block text-xs text-muted-foreground">
+                    Dashboard and Portfolio use live quotes only when this is enabled
+                    and valuation mode is set to Live prices.
+                  </span>
                 </span>
               </label>
 

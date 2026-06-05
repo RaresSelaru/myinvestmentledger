@@ -18,6 +18,12 @@ ALPHA_VANTAGE_API_KEY=
 TWELVE_DATA_API_KEY=
 ```
 
+Required only if you save provider keys from the in-app Settings page:
+
+```bash
+MARKET_DATA_SECRET=
+```
+
 Do not add the Supabase `service_role` key to this app. `NEXT_PUBLIC_*` variables are visible in the browser bundle.
 
 Pull local env vars from Vercel:

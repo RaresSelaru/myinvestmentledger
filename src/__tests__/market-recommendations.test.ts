@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { InMemoryMarketDataCache } from "@/lib/market-data/cache";
 import { MarketDataService } from "@/lib/market-data/service";
-import type { MarketDataProvider } from "@/lib/market-data/types";
+import type { MarketDataProvider, MarketQuote } from "@/lib/market-data/types";
 import { scoreRecommendations } from "@/lib/recommendations/scoring";
 import type { HoldingView } from "@/lib/types";
 
@@ -87,6 +87,39 @@ describe("market data and recommendations", () => {
     const stale = await staleOnly.getQuote("AAPL");
     expect(stale?.price).toBe(123);
     expect(stale?.isStale).toBe(true);
+  });
+
+  it("stores XTB .US quote aliases under the app symbol", async () => {
+    const cache = new InMemoryMarketDataCache();
+    const requestedSymbols: string[] = [];
+    const service = new MarketDataService(cache, [
+      {
+        ...provider("alias-aware", null),
+        async getQuote(symbol) {
+          requestedSymbols.push(symbol);
+
+          if (symbol !== "ALAB") {
+            return null;
+          }
+
+          return {
+            symbol,
+            price: 340,
+            currency: "USD",
+            provider: "alias-aware",
+            fetchedAt: new Date().toISOString(),
+          };
+        },
+      },
+    ]);
+
+    const quote = await service.getQuote("ALAB.US");
+    const cached = await cache.get<MarketQuote>("ALAB.US", "quote", "USD");
+
+    expect(requestedSymbols).toEqual(["ALAB.US", "ALAB"]);
+    expect(quote?.symbol).toBe("ALAB.US");
+    expect(quote?.providerSymbol).toBe("ALAB");
+    expect(cached?.payload.symbol).toBe("ALAB.US");
   });
 
   it("scores transparent accumulation and trimming candidates", () => {

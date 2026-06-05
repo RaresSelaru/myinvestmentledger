@@ -18,7 +18,10 @@ import {
   stagedImportSchema,
 } from "@/lib/schemas/manual-entry";
 import { SupabaseMarketDataCache } from "@/lib/market-data/cache";
-import { createProviderByName } from "@/lib/market-data/providers";
+import {
+  createFrankfurterFxProvider,
+  createProviderByName,
+} from "@/lib/market-data/providers";
 import { MarketDataService } from "@/lib/market-data/service";
 import { SupabaseImportRepository } from "@/lib/import/supabase-import-repository";
 import {
@@ -202,6 +205,10 @@ async function configuredMarketProviders(
     if (provider) {
       providers.push(provider);
     }
+  }
+
+  if (providers.length) {
+    providers.push(createFrankfurterFxProvider());
   }
 
   return providers;
@@ -579,6 +586,13 @@ export async function refreshPortfolioQuotesAction(formData: FormData) {
     const quotes = (await service.refreshMarketData(symbols)).filter(
       Boolean
     ) as MarketQuote[];
+
+    if (!quotes.length) {
+      throw new Error(
+        "No live quotes were returned. Check the API key or provider support for your symbols."
+      );
+    }
+
     const baseCurrency = String(portfolioRows?.[0]?.base_currency ?? "RON");
     const quoteCurrencies = Array.from(
       new Set(quotes.map((quote) => quote.currency.toUpperCase()))

@@ -1,6 +1,10 @@
 import {
   createConfiguredProviders,
 } from "@/lib/market-data/providers";
+import {
+  normalizeMarketSymbol,
+  providerSymbolCandidates,
+} from "@/lib/market-data/symbols";
 import type {
   CachedMarketData,
   CompanyProfile,
@@ -50,22 +54,41 @@ export class MarketDataService {
   ) {}
 
   async getQuote(symbol: string): Promise<MarketQuote | null> {
-    const cache = await this.cache.get<MarketQuote>(symbol, "quote", "USD");
+    const appSymbol = normalizeMarketSymbol(symbol);
+    const cache = await this.cache.get<MarketQuote>(appSymbol, "quote", "USD");
 
     if (isFresh(cache)) {
       return cache!.payload;
     }
 
     for (const provider of this.providers) {
-      const quote = await provider.getQuote(symbol);
+      for (const providerSymbol of providerSymbolCandidates(appSymbol)) {
+        const quote = await provider.getQuote(providerSymbol);
 
-      if (quote) {
-        await this.cache.set(withExpiry(symbol, "quote", quote.currency, quote.provider, quote, quote.fetchedAt));
-        return quote;
+        if (quote) {
+          const normalizedQuote: MarketQuote = {
+            ...quote,
+            symbol: appSymbol,
+            providerSymbol:
+              providerSymbol === appSymbol ? undefined : providerSymbol,
+          };
+
+          await this.cache.set(
+            withExpiry(
+              appSymbol,
+              "quote",
+              normalizedQuote.currency,
+              normalizedQuote.provider,
+              normalizedQuote,
+              normalizedQuote.fetchedAt
+            )
+          );
+          return normalizedQuote;
+        }
       }
     }
 
-    return cache ? { ...cache.payload, isStale: true } : null;
+    return cache ? { ...cache.payload, symbol: appSymbol, isStale: true } : null;
   }
 
   async getCompanyProfile(symbol: string): Promise<CompanyProfile | null> {

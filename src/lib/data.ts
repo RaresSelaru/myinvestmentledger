@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { cache } from "react";
 import { computePortfolioSummary, enrichHoldings, rankCandidates, round } from "@/lib/finance";
+import { providerSymbolCandidates } from "@/lib/market-data/symbols";
 import { getPreviewWorkspaceData } from "@/lib/mock-data";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
@@ -313,7 +314,9 @@ function applyLiveValuation(input: {
 
   let liveCount = 0;
   const holdings = input.holdings.map((holding) => {
-    const quoteRow = quoteRows.get(holding.symbol.toUpperCase());
+    const quoteRow = providerSymbolCandidates(holding.symbol)
+      .map((candidate) => quoteRows.get(candidate))
+      .find(Boolean);
 
     if (!quoteRow) {
       return holding;

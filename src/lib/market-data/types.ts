@@ -4,6 +4,7 @@ export type MarketDataType = "quote" | "profile" | "fundamentals" | "fx";
 
 export type MarketQuote = {
   symbol: string;
+  providerSymbol?: string;
   price: number;
   currency: CurrencyCode;
   provider: string;

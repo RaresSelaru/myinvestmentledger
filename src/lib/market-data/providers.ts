@@ -228,13 +228,53 @@ export function createTwelveDataProvider(apiKey?: string): MarketDataProvider | 
   };
 }
 
+export function createFrankfurterFxProvider(): MarketDataProvider {
+  return {
+    name: "frankfurter",
+    async getQuote(): Promise<MarketQuote | null> {
+      return null;
+    },
+    async getCompanyProfile(): Promise<CompanyProfile | null> {
+      return null;
+    },
+    async getFundamentals(): Promise<Fundamentals | null> {
+      return null;
+    },
+    async getFxRate(fromCurrency: CurrencyCode, toCurrency: CurrencyCode): Promise<FxRate | null> {
+      const json = await safeJson(
+        `https://api.frankfurter.app/latest?from=${encodeURIComponent(
+          fromCurrency
+        )}&to=${encodeURIComponent(toCurrency)}`
+      );
+      const rates = json?.rates as Record<string, unknown> | undefined;
+      const rate = Number(rates?.[toCurrency.toUpperCase()]);
+
+      if (!Number.isFinite(rate) || rate <= 0) return null;
+
+      return {
+        fromCurrency,
+        toCurrency,
+        rate,
+        provider: "frankfurter",
+        fetchedAt: now(),
+      };
+    },
+  };
+}
+
 export function createConfiguredProviders() {
-  return [
+  const providers = [
     createFinnhubProvider(process.env.FINNHUB_API_KEY),
     createFmpProvider(process.env.FMP_API_KEY),
     createAlphaVantageProvider(process.env.ALPHA_VANTAGE_API_KEY),
     createTwelveDataProvider(process.env.TWELVE_DATA_API_KEY),
   ].filter((provider): provider is MarketDataProvider => Boolean(provider));
+
+  if (providers.length) {
+    providers.push(createFrankfurterFxProvider());
+  }
+
+  return providers;
 }
 
 export function createProviderByName(

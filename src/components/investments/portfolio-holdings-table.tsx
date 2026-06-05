@@ -22,10 +22,16 @@ import {
 } from "@/components/ui/table";
 import { CoreSatelliteBar } from "@/components/investments/core-satellite-bar";
 import { SignedPercent } from "@/components/investments/signed-value";
-import { formatCurrency, formatPercent } from "@/lib/format";
+import { formatCurrency, formatMoneyPrecise, formatPercent } from "@/lib/format";
 import type { HoldingView } from "@/lib/types";
 
-type SortKey = "symbol" | "actualAllocation" | "drift" | "plPercent";
+type SortKey =
+  | "symbol"
+  | "currentPrice"
+  | "averageCost"
+  | "actualAllocation"
+  | "drift"
+  | "plPercent";
 
 export function PortfolioHoldingsTable({
   holdings,
@@ -78,6 +84,8 @@ export function PortfolioHoldingsTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="symbol">Symbol</SelectItem>
+            <SelectItem value="currentPrice">Current price</SelectItem>
+            <SelectItem value="averageCost">Average cost</SelectItem>
             <SelectItem value="actualAllocation">Allocation %</SelectItem>
             <SelectItem value="drift">Drift %</SelectItem>
             <SelectItem value="plPercent">P/L %</SelectItem>
@@ -99,6 +107,8 @@ export function PortfolioHoldingsTable({
               <TableRow className="bg-muted/35 hover:bg-muted/35">
                 <TableHead>Symbol</TableHead>
                 <TableHead>Company</TableHead>
+                <TableHead className="text-right">Current price</TableHead>
+                <TableHead className="text-right">Avg cost</TableHead>
                 <TableHead className="text-right">Market value</TableHead>
                 <TableHead className="text-right">Actual %</TableHead>
                 <TableHead className="text-right">Target %</TableHead>
@@ -117,6 +127,12 @@ export function PortfolioHoldingsTable({
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {holding.companyName ?? "-"}
+                  </TableCell>
+                  <TableCell className="text-right metric-tabular">
+                    {formatMoneyPrecise(holding.currentPrice, holding.currency)}
+                  </TableCell>
+                  <TableCell className="text-right metric-tabular">
+                    {formatMoneyPrecise(holding.averageCost, holding.currency)}
                   </TableCell>
                   <TableCell className="text-right metric-tabular">
                     {formatCurrency(holding.marketValue, currency)}
