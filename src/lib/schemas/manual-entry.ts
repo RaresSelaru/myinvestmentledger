@@ -63,6 +63,41 @@ const optionalPercentNumber = z.preprocess(
   z.coerce.number().min(0).max(100).nullable()
 );
 
+const optionalScoreNumber = z.preprocess(
+  (value) => (value === "" || value === null || value === undefined ? null : value),
+  z.coerce.number().min(1).max(10).nullable()
+);
+
+const optionalText = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim().length > 0
+      ? value.trim()
+      : null,
+  z.string().max(120).nullable()
+);
+
+const optionalLongText = z.preprocess(
+  (value) =>
+    typeof value === "string" && value.trim().length > 0
+      ? value.trim()
+      : null,
+  z.string().max(1000).nullable()
+);
+
+export const decisionRoleSchema = z.enum(["core", "satellite", "speculative"]);
+
+export const companyTypeSchema = z.enum([
+  "profitable_growth",
+  "high_growth_unprofitable",
+  "speculative_prerevenue",
+  "industrial_infrastructure",
+  "cyclical_semiconductor",
+  "banks_financials",
+  "commodity_exposed",
+]);
+
+export const zoneModeSchema = z.enum(["auto", "manual", "locked", "suggested"]);
+
 export const targetItemSchema = z
   .object({
     symbol: z.string().trim().min(1).max(32),
@@ -72,6 +107,19 @@ export const targetItemSchema = z
     targetSellPrice: optionalPositiveNumber,
     corePercent: z.coerce.number().min(0).max(100),
     satellitePercent: z.coerce.number().min(0).max(100),
+    role: decisionRoleSchema.nullable(),
+    companyType: companyTypeSchema.nullable(),
+    theme: optionalText,
+    zoneMode: zoneModeSchema.default("suggested"),
+    manualFairValue: optionalPositiveNumber,
+    manualBuyAnchor: optionalPositiveNumber,
+    manualTrimAnchor: optionalPositiveNumber,
+    thesisIntegrityScore: optionalScoreNumber,
+    catalystQualityScore: optionalScoreNumber,
+    themeStrengthScore: optionalScoreNumber,
+    valueChainCriticalityScore: optionalScoreNumber,
+    macroUncertaintyScore: optionalScoreNumber,
+    qualitativeComment: optionalLongText,
   })
   .superRefine((value, ctx) => {
     if (

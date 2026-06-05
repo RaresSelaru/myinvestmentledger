@@ -9,11 +9,18 @@ import type {
   CachedMarketData,
   CompanyProfile,
   Fundamentals,
+  FinancialRatios,
+  FinancialStatementPeriod,
+  FinancialStatementRow,
   FxRate,
+  KeyMetrics,
   MarketDataCache,
   MarketDataProvider,
   MarketDataType,
   MarketQuote,
+  PriceHistoryRange,
+  PricePoint,
+  SymbolSearchResult,
 } from "@/lib/market-data/types";
 import type { CurrencyCode } from "@/lib/types";
 
@@ -22,6 +29,11 @@ const TTL_MS: Record<MarketDataType, number> = {
   fx: 15 * 60 * 1000,
   profile: 24 * 60 * 60 * 1000,
   fundamentals: 24 * 60 * 60 * 1000,
+  price_history: 24 * 60 * 60 * 1000,
+  financial_statements: 24 * 60 * 60 * 1000,
+  financial_ratios: 24 * 60 * 60 * 1000,
+  key_metrics: 24 * 60 * 60 * 1000,
+  symbol_search: 24 * 60 * 60 * 1000,
 };
 
 type MarketDataServiceOptions = {
@@ -134,6 +146,113 @@ export class MarketDataService {
     }
 
     return cache ? { ...cache.payload, isStale: true } : null;
+  }
+
+  async getPriceHistory(
+    symbol: string,
+    range: PriceHistoryRange
+  ): Promise<PricePoint[]> {
+    const appSymbol = normalizeMarketSymbol(symbol);
+
+    for (const provider of this.providers) {
+      if (!provider.getPriceHistory) continue;
+
+      for (const providerSymbol of providerSymbolCandidates(appSymbol)) {
+        const history = await provider.getPriceHistory(providerSymbol, range);
+
+        if (history.length) {
+          return history.map((point) => ({
+            ...point,
+            symbol: appSymbol,
+          }));
+        }
+      }
+    }
+
+    return [];
+  }
+
+  async getFinancialStatements(
+    symbol: string,
+    period: FinancialStatementPeriod
+  ): Promise<FinancialStatementRow[]> {
+    const appSymbol = normalizeMarketSymbol(symbol);
+
+    for (const provider of this.providers) {
+      if (!provider.getFinancialStatements) continue;
+
+      for (const providerSymbol of providerSymbolCandidates(appSymbol)) {
+        const statements = await provider.getFinancialStatements(
+          providerSymbol,
+          period
+        );
+
+        if (statements.length) {
+          return statements.map((statement) => ({
+            ...statement,
+            symbol: appSymbol,
+          }));
+        }
+      }
+    }
+
+    return [];
+  }
+
+  async getFinancialRatios(symbol: string): Promise<FinancialRatios | null> {
+    const appSymbol = normalizeMarketSymbol(symbol);
+
+    for (const provider of this.providers) {
+      if (!provider.getFinancialRatios) continue;
+
+      for (const providerSymbol of providerSymbolCandidates(appSymbol)) {
+        const ratios = await provider.getFinancialRatios(providerSymbol);
+
+        if (ratios) {
+          return { ...ratios, symbol: appSymbol };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  async getKeyMetrics(symbol: string): Promise<KeyMetrics | null> {
+    const appSymbol = normalizeMarketSymbol(symbol);
+
+    for (const provider of this.providers) {
+      if (!provider.getKeyMetrics) continue;
+
+      for (const providerSymbol of providerSymbolCandidates(appSymbol)) {
+        const metrics = await provider.getKeyMetrics(providerSymbol);
+
+        if (metrics) {
+          return { ...metrics, symbol: appSymbol };
+        }
+      }
+    }
+
+    return null;
+  }
+
+  async searchSymbol(query: string): Promise<SymbolSearchResult[]> {
+    const cleanQuery = query.trim();
+
+    if (!cleanQuery) {
+      return [];
+    }
+
+    for (const provider of this.providers) {
+      if (!provider.searchSymbol) continue;
+
+      const results = await provider.searchSymbol(cleanQuery);
+
+      if (results.length) {
+        return results;
+      }
+    }
+
+    return [];
   }
 
   async getFxRate(fromCurrency: CurrencyCode, toCurrency: CurrencyCode): Promise<FxRate | null> {

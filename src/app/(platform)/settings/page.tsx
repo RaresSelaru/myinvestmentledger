@@ -309,6 +309,42 @@ export default async function SettingsPage({ searchParams }: SettingsPageProps) 
           </form>
         </CardContent>
       </Card>
+
+      <Card size="sm" className="mx-auto max-w-4xl">
+        <CardHeader>
+          <CardTitle className="text-sm">Symbol mapping readiness</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Broker symbols can differ from provider symbols. For now the app uses
+            automatic aliases, then verified mappings can be added in the next stage.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {workspace.symbolMappings.length ? (
+              workspace.symbolMappings.map((mapping) => (
+                <div
+                  key={mapping.internalSymbol}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-border/70 bg-card px-4 py-3 text-sm shadow-sm"
+                >
+                  <div>
+                    <p className="font-medium">{mapping.internalSymbol}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Provider symbol: {mapping.providerSymbol ?? "Not mapped"}
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
+                    {mapping.verified ? "Verified" : "Alias"}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <p className="rounded-2xl border border-dashed border-border/70 bg-muted/35 p-5 text-sm text-muted-foreground">
+                Import holdings first, then symbol mapping readiness appears here.
+              </p>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

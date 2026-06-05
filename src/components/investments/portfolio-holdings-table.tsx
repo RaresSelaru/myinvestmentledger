@@ -21,8 +21,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CoreSatelliteBar } from "@/components/investments/core-satellite-bar";
+import { DecisionScoreBar } from "@/components/investments/decision-score-bar";
+import { PriceZoneBar } from "@/components/investments/price-zone-bar";
 import { SignedPercent } from "@/components/investments/signed-value";
-import { formatCurrency, formatMoneyPrecise, formatPercent } from "@/lib/format";
+import { formatCurrency, formatPercent } from "@/lib/format";
 import type { HoldingView } from "@/lib/types";
 
 type SortKey =
@@ -106,13 +108,14 @@ export function PortfolioHoldingsTable({
             <TableHeader>
               <TableRow className="bg-muted/35 hover:bg-muted/35">
                 <TableHead>Symbol</TableHead>
-                <TableHead>Company</TableHead>
-                <TableHead className="text-right">Current price</TableHead>
-                <TableHead className="text-right">Avg cost</TableHead>
                 <TableHead className="text-right">Market value</TableHead>
                 <TableHead className="text-right">Actual %</TableHead>
                 <TableHead className="text-right">Target %</TableHead>
                 <TableHead className="text-right">Drift %</TableHead>
+                <TableHead className="min-w-48">Price Zone</TableHead>
+                <TableHead className="min-w-32">Accumulation</TableHead>
+                <TableHead className="min-w-32">Trim</TableHead>
+                <TableHead className="min-w-32">Exit Risk</TableHead>
                 <TableHead className="text-right">P/L %</TableHead>
                 <TableHead className="min-w-32">Core/Satellite</TableHead>
               </TableRow>
@@ -122,17 +125,11 @@ export function PortfolioHoldingsTable({
                 <TableRow key={holding.symbol}>
                   <TableCell className="font-medium">
                     <Link href={`/portfolio/${holding.symbol}`}>
-                      {holding.symbol}
+                      <span>{holding.symbol}</span>
+                      <span className="mt-1 block text-xs font-normal text-muted-foreground">
+                        {holding.companyName ?? "-"}
+                      </span>
                     </Link>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {holding.companyName ?? "-"}
-                  </TableCell>
-                  <TableCell className="text-right metric-tabular">
-                    {formatMoneyPrecise(holding.currentPrice, holding.currency)}
-                  </TableCell>
-                  <TableCell className="text-right metric-tabular">
-                    {formatMoneyPrecise(holding.averageCost, holding.currency)}
                   </TableCell>
                   <TableCell className="text-right metric-tabular">
                     {formatCurrency(holding.marketValue, currency)}
@@ -141,10 +138,47 @@ export function PortfolioHoldingsTable({
                     {formatPercent(holding.actualAllocation)}
                   </TableCell>
                   <TableCell className="text-right metric-tabular">
-                    {formatPercent(holding.targetAllocation)}
+                    {holding.targetConfigured ? (
+                      formatPercent(holding.targetAllocation)
+                    ) : (
+                      <Link href="/strategy" className="text-xs text-primary">
+                        Not set
+                      </Link>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <SignedPercent value={holding.drift} context="drift" />
+                    {holding.targetConfigured ? (
+                      <SignedPercent value={holding.drift} context="drift" />
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <PriceZoneBar
+                      zone={holding.priceZone}
+                      currency={holding.currency}
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <DecisionScoreBar
+                      score={holding.decisionScore?.scores.accumulation}
+                      variant="accumulation"
+                      compact
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <DecisionScoreBar
+                      score={holding.decisionScore?.scores.trim}
+                      variant="trim"
+                      compact
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <DecisionScoreBar
+                      score={holding.decisionScore?.scores.liquidationRisk}
+                      variant="exitRisk"
+                      compact
+                    />
                   </TableCell>
                   <TableCell className="text-right">
                     <SignedPercent value={holding.plPercent} />

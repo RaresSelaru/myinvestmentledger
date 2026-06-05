@@ -5,12 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { CoreSatelliteBar } from "@/components/investments/core-satellite-bar";
+import { DecisionScoreBar } from "@/components/investments/decision-score-bar";
 import { ExplainNumber } from "@/components/investments/explain-number";
 import { LiveQuotesRefresher } from "@/components/investments/live-quotes-refresher";
+import { PriceZoneChart } from "@/components/investments/price-zone-chart";
+import { RecalculateZonesButton } from "@/components/investments/recalculate-zones-button";
 import { SignedPercent } from "@/components/investments/signed-value";
+import { WhyPanel } from "@/components/investments/why-panel";
+import { ZoneModeControl } from "@/components/investments/zone-mode-control";
 import { getStockDetailData } from "@/lib/data";
 import {
   formatCurrency,
+  formatDateTime,
   formatMoneyPrecise,
   formatNumber,
   formatPercent,
@@ -44,6 +50,8 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
   }
 
   const transactions = workspace.transactions;
+  const decision = holding.decisionScore;
+  const redirectTo = `/portfolio/${holding.symbol}`;
 
   if (workspace.isLocked) {
     return (
@@ -104,6 +112,88 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
         />
       </section>
 
+      <section className="grid gap-4 lg:grid-cols-5">
+        <Metric
+          label="Accumulation"
+          value={decision?.scores.accumulation.finalScore.toFixed(0) ?? "-"}
+        />
+        <Metric
+          label="Hold"
+          value={decision?.scores.hold.finalScore.toFixed(0) ?? "-"}
+        />
+        <Metric
+          label="Trim"
+          value={decision?.scores.trim.finalScore.toFixed(0) ?? "-"}
+        />
+        <Metric
+          label="Exit risk"
+          value={decision?.scores.liquidationRisk.finalScore.toFixed(0) ?? "-"}
+        />
+        <Metric
+          label="Portfolio fit"
+          value={decision?.scores.portfolioFit.finalScore.toFixed(0) ?? "-"}
+        />
+      </section>
+
+      {decision ? (
+        <Card>
+          <CardContent className="grid gap-4 p-5 lg:grid-cols-5">
+            <DecisionScoreBar
+              label="Accumulation"
+              score={decision.scores.accumulation}
+              variant="accumulation"
+            />
+            <DecisionScoreBar label="Hold" score={decision.scores.hold} variant="hold" />
+            <DecisionScoreBar label="Trim" score={decision.scores.trim} variant="trim" />
+            <DecisionScoreBar
+              label="Exit risk"
+              score={decision.scores.liquidationRisk}
+              variant="exitRisk"
+            />
+            <DecisionScoreBar
+              label="Portfolio fit"
+              score={decision.scores.portfolioFit}
+              variant="portfolioFit"
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+        <PriceZoneChart
+          zone={holding.priceZone}
+          currency={holding.currency}
+          recentActivity={decision?.recentActivity}
+        />
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Recalculation</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <RecalculateZonesButton
+                portfolioId={workspace.activePortfolio.id}
+                symbol={holding.symbol}
+                redirectTo={redirectTo}
+                disabled={workspace.isLocked}
+              />
+            </div>
+            <ZoneModeControl
+              portfolioId={workspace.activePortfolio.id}
+              symbol={holding.symbol}
+              zone={holding.priceZone}
+              redirectTo={redirectTo}
+              disabled={workspace.isLocked}
+            />
+            <div className="rounded-2xl border border-border/70 bg-muted/25 p-3 text-sm text-muted-foreground">
+              Current mode: {holding.priceZone?.zoneMode ?? holding.zoneMode ?? "suggested"}
+            </div>
+          </CardContent>
+        </Card>
+      </section>
+
+      <WhyPanel decision={decision} />
+
       <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
         <Card>
           <CardHeader>
@@ -112,27 +202,34 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
           <CardContent className="space-y-5">
             <div className="grid grid-cols-3 gap-3 text-sm">
               <Metric label="Actual" value={formatPercent(holding.actualAllocation)} />
-              <Metric label="Target" value={formatPercent(holding.targetAllocation)} />
+              <Metric
+                label="Target"
+                value={holding.targetConfigured ? formatPercent(holding.targetAllocation) : "Not set"}
+              />
               <Metric
                 label="Drift"
                 value={
-                  <span className="flex items-center gap-1">
-                    <SignedPercent value={holding.drift} context="drift" />
-                    <ExplainNumber
-                      formula="Actual portfolio % - Target portfolio %"
-                      inputs={[
-                        {
-                          label: "Actual allocation",
-                          value: formatPercent(holding.actualAllocation),
-                        },
-                        {
-                          label: "Target allocation",
-                          value: formatPercent(holding.targetAllocation),
-                        },
-                      ]}
-                      updatedAt={holding.updatedAt}
-                    />
-                  </span>
+                  holding.targetConfigured ? (
+                    <span className="flex items-center gap-1">
+                      <SignedPercent value={holding.drift} context="drift" />
+                      <ExplainNumber
+                        formula="Actual portfolio % - Target portfolio %"
+                        inputs={[
+                          {
+                            label: "Actual allocation",
+                            value: formatPercent(holding.actualAllocation),
+                          },
+                          {
+                            label: "Target allocation",
+                            value: formatPercent(holding.targetAllocation),
+                          },
+                        ]}
+                        updatedAt={holding.updatedAt}
+                      />
+                    </span>
+                  ) : (
+                    "-"
+                  )
                 }
               />
             </div>
@@ -211,7 +308,7 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Transaction timeline</CardTitle>
+          <CardTitle className="text-base">Recent activity</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {transactions.length ? (
@@ -234,6 +331,19 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
               No symbol-specific ledger rows yet.
             </p>
           )}
+          {workspace.decisionEvents.length ? (
+            <div className="space-y-2 pt-2">
+              {workspace.decisionEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className="flex items-center justify-between gap-4 rounded-2xl border border-border/70 bg-muted/25 px-4 py-3 text-sm"
+                >
+                  <span>{formatDateTime(event.date)}</span>
+                  <span className="text-muted-foreground">{event.summary}</span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

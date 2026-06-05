@@ -8,16 +8,28 @@ import type {
   AccountOverview,
   BrokerCashOverride,
   BrokerAccount,
+  CompanyType,
+  ConfidenceLabel,
+  DecisionCockpit,
+  DecisionEventView,
+  DecisionRole,
+  DecisionScorePoint,
+  DecisionScoreView,
+  DecisionZoneLabel,
   Holding,
+  HoldingView,
   MarketDataApiKeyStatus,
   MarketDataProviderName,
   MarketDataSettings,
+  PriceZoneView,
   Portfolio,
   SettingsData,
+  SymbolMappingStatus,
   StrategyData,
   Transaction,
   WorkspaceData,
   WorkspaceShellData,
+  ZoneMode,
 } from "@/lib/types";
 
 type SupabaseClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
@@ -98,6 +110,16 @@ function numberFrom(value: unknown, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function nullableNumberFrom(value: unknown) {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function nullableStringFrom(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function latestSnapshotCash(
   rows: Record<string, unknown>[],
   overrides: BrokerCashOverride[] = []
@@ -163,11 +185,83 @@ function mapHolding(row: Record<string, unknown>): Holding {
       row.target_sell_price === null ? null : numberFrom(row.target_sell_price),
     corePercent: numberFrom(row.core_percent, 100),
     satellitePercent: numberFrom(row.satellite_percent),
+    role: nullableStringFrom(row.role) as DecisionRole | null,
+    companyType: nullableStringFrom(row.company_type) as CompanyType | null,
+    theme: nullableStringFrom(row.theme),
+    zoneMode: (nullableStringFrom(row.zone_mode) as ZoneMode | null) ?? "suggested",
+    manualFairValue: nullableNumberFrom(row.manual_fair_value),
+    manualBuyAnchor: nullableNumberFrom(row.manual_buy_anchor),
+    manualTrimAnchor: nullableNumberFrom(row.manual_trim_anchor),
+    thesisIntegrityScore: nullableNumberFrom(row.thesis_integrity_score),
+    catalystQualityScore: nullableNumberFrom(row.catalyst_quality_score),
+    themeStrengthScore: nullableNumberFrom(row.theme_strength_score),
+    valueChainCriticalityScore: nullableNumberFrom(
+      row.value_chain_criticality_score
+    ),
+    macroUncertaintyScore: nullableNumberFrom(row.macro_uncertainty_score),
+    qualitativeComment: nullableStringFrom(row.qualitative_comment),
     updatedAt: String(row.updated_at ?? ""),
     sourceReferences: Array.isArray(row.source_refs)
       ? (row.source_refs as Holding["sourceReferences"])
       : [],
   };
+}
+
+function mergeTargetRowsIntoHoldings(
+  holdings: Holding[],
+  targetRows: Record<string, unknown>[]
+): Holding[] {
+  const targetBySymbol = new Map(
+    targetRows.map((row) => [String(row.symbol ?? "").toUpperCase(), row])
+  );
+
+  return holdings.map((holding) => {
+    const target = targetBySymbol.get(holding.symbol.toUpperCase());
+
+    if (!target) {
+      return holding;
+    }
+
+    return {
+      ...holding,
+      targetAllocation: numberFrom(
+        target.target_allocation_pct ?? target.target_allocation,
+        holding.targetAllocation
+      ),
+      maxAllocation: nullableNumberFrom(
+        target.max_allocation_pct ?? target.max_allocation
+      ),
+      targetBuyPrice: nullableNumberFrom(target.target_buy_price),
+      targetSellPrice: nullableNumberFrom(target.target_sell_price),
+      corePercent: numberFrom(target.core_pct ?? target.core_percent, holding.corePercent),
+      satellitePercent: numberFrom(
+        target.satellite_pct ?? target.satellite_percent,
+        holding.satellitePercent
+      ),
+      role: nullableStringFrom(target.role) as DecisionRole | null,
+      companyType: nullableStringFrom(target.company_type) as CompanyType | null,
+      theme: nullableStringFrom(target.theme),
+      zoneMode:
+        (nullableStringFrom(target.zone_mode) as ZoneMode | null) ??
+        holding.zoneMode ??
+        "suggested",
+      manualFairValue: nullableNumberFrom(target.manual_fair_value),
+      manualBuyAnchor:
+        nullableNumberFrom(target.manual_buy_anchor) ??
+        nullableNumberFrom(target.target_buy_price),
+      manualTrimAnchor:
+        nullableNumberFrom(target.manual_trim_anchor) ??
+        nullableNumberFrom(target.target_sell_price),
+      thesisIntegrityScore: nullableNumberFrom(target.thesis_integrity_score),
+      catalystQualityScore: nullableNumberFrom(target.catalyst_quality_score),
+      themeStrengthScore: nullableNumberFrom(target.theme_strength_score),
+      valueChainCriticalityScore: nullableNumberFrom(
+        target.value_chain_criticality_score
+      ),
+      macroUncertaintyScore: nullableNumberFrom(target.macro_uncertainty_score),
+      qualitativeComment: nullableStringFrom(target.qualitative_comment),
+    };
+  });
 }
 
 function mapTransaction(row: Record<string, unknown>): Transaction {
@@ -244,6 +338,367 @@ function mapCashOverride(row: Record<string, unknown>): BrokerCashOverride {
     amount: numberFrom(row.amount),
     currency: String(row.currency ?? "RON"),
     comment: row.comment ? String(row.comment) : null,
+  };
+}
+
+function mapSymbolMappingStatus(
+  symbol: string,
+  mapping?: Record<string, unknown>
+): SymbolMappingStatus {
+  const normalized = symbol.toUpperCase();
+  const alias = providerSymbolCandidates(normalized).at(-1) ?? normalized;
+
+  return {
+    internalSymbol: normalized,
+    provider: mapping?.provider ? String(mapping.provider) : null,
+    providerSymbol: mapping?.provider_symbol
+      ? String(mapping.provider_symbol)
+      : alias,
+    exchange: mapping?.exchange ? String(mapping.exchange) : null,
+    currency: mapping?.currency ? String(mapping.currency) : null,
+    assetType: mapping?.asset_type ? String(mapping.asset_type) : null,
+    verified: Boolean(mapping?.verified),
+  };
+}
+
+function decisionScorePoint(value: unknown): DecisionScorePoint {
+  if (typeof value === "object" && value !== null) {
+    const row = value as Record<string, unknown>;
+    return {
+      rawScore: numberFrom(row.rawScore),
+      finalScore: numberFrom(row.finalScore),
+    };
+  }
+
+  return { rawScore: 0, finalScore: 0 };
+}
+
+function jsonObject(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function confidenceLabel(value: unknown): ConfidenceLabel {
+  return value === "high" || value === "medium" || value === "low"
+    ? value
+    : "low";
+}
+
+function zoneLabel(value: unknown): DecisionZoneLabel {
+  const labels: DecisionZoneLabel[] = [
+    "strong_accumulation",
+    "light_accumulation",
+    "hold",
+    "trim_review",
+    "strong_trim",
+    "exit_review",
+    "needs_setup",
+  ];
+
+  return labels.includes(value as DecisionZoneLabel)
+    ? (value as DecisionZoneLabel)
+    : "needs_setup";
+}
+
+function mapPriceZone(
+  symbol: string,
+  row?: Record<string, unknown> | null,
+  fallback?: Record<string, unknown> | null
+): PriceZoneView | null {
+  const rawOutputs = row ? jsonObject(row.raw_outputs_json) : fallback ?? {};
+  const zonePayload =
+    typeof rawOutputs.effectivePriceZones === "object" &&
+    rawOutputs.effectivePriceZones !== null
+      ? (rawOutputs.effectivePriceZones as Record<string, unknown>)
+      : typeof rawOutputs.priceZones === "object" && rawOutputs.priceZones !== null
+        ? (rawOutputs.priceZones as Record<string, unknown>)
+        : {};
+  const suggestedPayload =
+    typeof rawOutputs.suggestedPriceZones === "object" &&
+    rawOutputs.suggestedPriceZones !== null
+      ? (rawOutputs.suggestedPriceZones as Record<string, unknown>)
+      : null;
+
+  if (!row && !Object.keys(zonePayload).length) {
+    return null;
+  }
+
+  const view: PriceZoneView = {
+    symbol,
+    zoneMode:
+      String(row?.zone_mode ?? zonePayload.zoneMode ?? "suggested") === "auto"
+        ? "auto"
+        : String(row?.zone_mode ?? zonePayload.zoneMode ?? "suggested") === "manual"
+          ? "manual"
+          : String(row?.zone_mode ?? zonePayload.zoneMode ?? "suggested") === "locked"
+            ? "locked"
+            : "suggested",
+    currentZone: zoneLabel(rawOutputs.currentZone ?? zonePayload.currentZone),
+    strongAccumulation: nullableNumberFrom(
+      row?.strong_accumulation ?? zonePayload.strongAccumulation
+    ),
+    lightAccumulation: nullableNumberFrom(
+      row?.light_accumulation ?? zonePayload.lightAccumulation
+    ),
+    holdLow: nullableNumberFrom(row?.hold_low ?? zonePayload.holdLow),
+    holdHigh: nullableNumberFrom(row?.hold_high ?? zonePayload.holdHigh),
+    trimReview: nullableNumberFrom(row?.trim_review ?? zonePayload.trimReview),
+    strongTrim: nullableNumberFrom(row?.strong_trim ?? zonePayload.strongTrim),
+    exitReview: nullableNumberFrom(rawOutputs.exitReview ?? zonePayload.exitReview),
+    currentPrice: nullableNumberFrom(zonePayload.currentPrice),
+    manualBuyAnchor: nullableNumberFrom(zonePayload.manualBuyAnchor),
+    manualTrimAnchor: nullableNumberFrom(zonePayload.manualTrimAnchor),
+    confidenceLabel: confidenceLabel(zonePayload.confidenceLabel),
+    source:
+      zonePayload.source === "manual" ||
+      zonePayload.source === "calculated" ||
+      zonePayload.source === "provisional"
+        ? zonePayload.source
+        : "provisional",
+    lastRecalculatedAt: nullableStringFrom(
+      row?.zone_last_recalculated_at ?? rawOutputs.calculatedAt
+    ),
+    recalculationReason: nullableStringFrom(
+      row?.zone_recalculation_reason ?? rawOutputs.recalculationReason
+    ),
+  };
+
+  if (suggestedPayload) {
+    view.suggestedZones = {
+      ...view,
+      strongAccumulation: nullableNumberFrom(suggestedPayload.strongAccumulation),
+      lightAccumulation: nullableNumberFrom(suggestedPayload.lightAccumulation),
+      holdLow: nullableNumberFrom(suggestedPayload.holdLow),
+      holdHigh: nullableNumberFrom(suggestedPayload.holdHigh),
+      trimReview: nullableNumberFrom(suggestedPayload.trimReview),
+      strongTrim: nullableNumberFrom(suggestedPayload.strongTrim),
+      exitReview: nullableNumberFrom(suggestedPayload.exitReview),
+      currentZone: zoneLabel(suggestedPayload.currentZone),
+    };
+  }
+
+  return view;
+}
+
+function mapDecisionScore(
+  row: Record<string, unknown>,
+  zone?: PriceZoneView | null
+): DecisionScoreView {
+  const scores = payloadObject({ payload: row.scores_json });
+  const outputs = jsonObject(row.raw_outputs_json);
+  const missing =
+    typeof row.missing_data_json === "object" && row.missing_data_json !== null
+      ? (row.missing_data_json as Record<string, unknown>)
+      : {};
+
+  return {
+    symbol: String(row.symbol ?? "").toUpperCase(),
+    calculationVersion: String(row.calculation_version ?? ""),
+    calculatedAt: String(row.calculated_at ?? ""),
+    scores: {
+      accumulation: decisionScorePoint(scores.accumulation_score),
+      hold: decisionScorePoint(scores.hold_score),
+      trim: decisionScorePoint(scores.trim_score),
+      liquidationRisk: decisionScorePoint(scores.liquidation_risk_score),
+      portfolioFit: decisionScorePoint(scores.portfolio_fit_score),
+    },
+    confidenceScore: numberFrom(row.confidence_score),
+    confidenceLabel: confidenceLabel(row.confidence_label),
+    positiveDrivers: Array.isArray(outputs.positiveDrivers)
+      ? (outputs.positiveDrivers as DecisionScoreView["positiveDrivers"])
+      : [],
+    negativeDrivers: Array.isArray(outputs.negativeDrivers)
+      ? (outputs.negativeDrivers as DecisionScoreView["negativeDrivers"])
+      : [],
+    gates:
+      typeof row.gates_json === "object" && row.gates_json !== null
+        ? Object.entries(row.gates_json as Record<string, Record<string, unknown>>)
+            .map(([name, gate]) => ({
+              name,
+              active: Boolean(gate.active),
+              label: String(gate.label ?? name),
+              effect: String(gate.effect ?? ""),
+            }))
+            .sort((a, b) => Number(b.active) - Number(a.active))
+        : [],
+    missingData: {
+      critical: Array.isArray(missing.critical)
+        ? missing.critical.map(String)
+        : [],
+      nonCritical: Array.isArray(missing.nonCritical)
+        ? missing.nonCritical.map(String)
+        : [],
+    },
+    staleData: Array.isArray(row.stale_data_json)
+      ? row.stale_data_json.map(String)
+      : [],
+    interpretation: zoneLabel(outputs.interpretation),
+    recentActivity:
+      typeof outputs.recentActivitySummary === "object" &&
+      outputs.recentActivitySummary !== null
+        ? (outputs.recentActivitySummary as DecisionScoreView["recentActivity"])
+        : null,
+    priceZone: zone ?? mapPriceZone(String(row.symbol ?? ""), null, outputs),
+  };
+}
+
+function latestDecisionScores(rows: Record<string, unknown>[]) {
+  const latest = new Map<string, Record<string, unknown>>();
+
+  for (const row of rows) {
+    const symbol = String(row.symbol ?? "").toUpperCase();
+
+    if (symbol && !latest.has(symbol)) {
+      latest.set(symbol, row);
+    }
+  }
+
+  return latest;
+}
+
+function attachDecisionViews({
+  holdings,
+  scoreRows,
+  zoneRows,
+}: {
+  holdings: HoldingView[];
+  scoreRows: Record<string, unknown>[];
+  zoneRows: Record<string, unknown>[];
+}) {
+  const latestScores = latestDecisionScores(scoreRows);
+  const zones = new Map(
+    zoneRows.map((row) => [String(row.symbol ?? "").toUpperCase(), row])
+  );
+
+  return holdings.map((holding) => {
+    const zone = mapPriceZone(
+      holding.symbol,
+      zones.get(holding.symbol.toUpperCase())
+    );
+    const decisionScoreRow = latestScores.get(holding.symbol.toUpperCase());
+    const decisionScore = decisionScoreRow
+      ? mapDecisionScore(decisionScoreRow, zone)
+      : null;
+
+    return {
+      ...holding,
+      decisionScore,
+      priceZone: zone ?? decisionScore?.priceZone ?? null,
+    };
+  });
+}
+
+function topDecisionReason(score: DecisionScoreView, kind: "accumulation" | "trim") {
+  const drivers =
+    kind === "accumulation" ? score.positiveDrivers : score.negativeDrivers;
+  return drivers[0]?.label ?? "Based on current strategy inputs";
+}
+
+function blockingGateNames(score: DecisionScoreView, kind: "accumulation" | "trim") {
+  const blockedForAccumulation = new Set([
+    "thesis_broken_gate",
+    "liquidity_balance_sheet_gate",
+    "max_allocation_gate",
+    "speculative_exposure_gate",
+    "missing_data_gate",
+  ]);
+  const blockedForTrim = new Set(["thesis_broken_gate"]);
+  const blocking = kind === "accumulation" ? blockedForAccumulation : blockedForTrim;
+
+  return score.gates
+    .filter((gate) => gate.active && blocking.has(gate.name))
+    .map((gate) => gate.label);
+}
+
+function buildDecisionCockpit(holdings: HoldingView[]): DecisionCockpit {
+  const candidates = holdings
+    .map((holding) => ({ holding, score: holding.decisionScore }))
+    .filter((item): item is { holding: HoldingView; score: DecisionScoreView } =>
+      Boolean(item.score)
+    );
+  const accumulationCandidates = candidates
+    .filter(({ score }) => {
+      const gates = blockingGateNames(score, "accumulation");
+      return (
+        score.scores.accumulation.finalScore >= 65 &&
+        score.confidenceLabel !== "low" &&
+        gates.length === 0
+      );
+    })
+    .sort((a, b) => b.score.scores.accumulation.finalScore - a.score.scores.accumulation.finalScore)
+    .slice(0, 3)
+    .map(({ holding, score }) => ({
+      kind: "accumulation" as const,
+      symbol: holding.symbol,
+      companyName: holding.companyName,
+      score: score.scores.accumulation.finalScore,
+      currentZone: score.priceZone?.currentZone ?? score.interpretation,
+      reason: topDecisionReason(score, "accumulation"),
+      confidenceLabel: score.confidenceLabel,
+      gateLabels: score.gates.filter((gate) => gate.active).map((gate) => gate.label),
+    }));
+  const trimCandidates = candidates
+    .filter(({ score }) => {
+      const gates = blockingGateNames(score, "trim");
+      return (
+        score.scores.trim.finalScore >= 65 &&
+        score.confidenceLabel !== "low" &&
+        gates.length === 0 &&
+        score.scores.liquidationRisk.finalScore < 75
+      );
+    })
+    .sort((a, b) => b.score.scores.trim.finalScore - a.score.scores.trim.finalScore)
+    .slice(0, 3)
+    .map(({ holding, score }) => ({
+      kind: "trim" as const,
+      symbol: holding.symbol,
+      companyName: holding.companyName,
+      score: score.scores.trim.finalScore,
+      currentZone: score.priceZone?.currentZone ?? score.interpretation,
+      reason: topDecisionReason(score, "trim"),
+      confidenceLabel: score.confidenceLabel,
+      gateLabels: score.gates.filter((gate) => gate.active).map((gate) => gate.label),
+    }));
+  const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+
+  return {
+    accumulationCandidates,
+    trimCandidates,
+    setup: {
+      missingTargetAllocation: holdings.filter((holding) => !holding.targetConfigured).length,
+      invalidCoreSatelliteSplit: holdings.filter(
+        (holding) => Math.round((holding.corePercent + holding.satellitePercent) * 100) / 100 !== 100
+      ).length,
+      missingCompanyType: holdings.filter((holding) => !holding.companyType).length,
+      missingThesisScore: holdings.filter(
+        (holding) => holding.thesisIntegrityScore === null || holding.thesisIntegrityScore === undefined
+      ).length,
+      missingPriceZones: holdings.filter((holding) => !holding.priceZone).length,
+      staleCalculations: holdings.filter((holding) => {
+        const calculatedAt = new Date(holding.decisionScore?.calculatedAt ?? 0).getTime();
+        return !Number.isFinite(calculatedAt) || calculatedAt < dayAgo;
+      }).length,
+    },
+  };
+}
+
+function mapDecisionEvent(row: Record<string, unknown>): DecisionEventView {
+  const next =
+    typeof row.next_json === "object" && row.next_json !== null
+      ? (row.next_json as Record<string, unknown>)
+      : {};
+  const eventType = String(row.event_type ?? "decision_event");
+  const symbol = row.symbol ? String(row.symbol) : null;
+  const zone = next.currentZone ? ` · ${String(next.currentZone).replaceAll("_", " ")}` : "";
+
+  return {
+    id: String(row.id),
+    date: String(row.created_at ?? ""),
+    symbol,
+    eventType,
+    reason: nullableStringFrom(row.reason),
+    summary: `${eventType.replaceAll("_", " ")}${zone}`,
   };
 }
 
@@ -693,6 +1148,8 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
     { data: settingsRows },
     { data: cashOverrideRows },
     { data: marketRows },
+    { data: decisionRows },
+    { data: zoneRows },
     { data: allHoldingRows },
     { data: allSnapshotRows },
     { data: allCashOverrideRows },
@@ -738,6 +1195,18 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
       .select("*")
       .eq("user_id", base.userId)
       .in("data_type", ["quote", "fx"]),
+    base.supabase
+      .from("decision_scores")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("calculated_at", { ascending: false })
+      .limit(1000),
+    base.supabase
+      .from("price_zones")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id),
     base.supabase
       .from("holdings")
       .select("*")
@@ -799,7 +1268,11 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
         ? "Manual cash override + broker snapshot"
         : "Broker cash snapshot";
   summary.dataStatus = valuation.status;
-  const holdings = enrichHoldings(valuation.holdings, summary.totalValue);
+  const holdings = attachDecisionViews({
+    holdings: enrichHoldings(valuation.holdings, summary.totalValue),
+    scoreRows: (decisionRows ?? []) as Record<string, unknown>[],
+    zoneRows: (zoneRows ?? []) as Record<string, unknown>[],
+  });
   const allRawHoldings = (allHoldingRows ?? []).map((row) =>
     mapHolding(row as Record<string, unknown>)
   );
@@ -836,6 +1309,7 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
     marketDataSettings,
     accumulationCandidates: rankCandidates(holdings, "accumulation"),
     trimmingCandidates: rankCandidates(holdings, "trimming"),
+    decisionCockpit: buildDecisionCockpit(holdings),
   };
 }
 
@@ -876,6 +1350,8 @@ export async function getPortfolioData(): Promise<
     { data: settingsRows },
     { data: cashOverrideRows },
     { data: marketRows },
+    { data: decisionRows },
+    { data: zoneRows },
   ] = await Promise.all([
     base.supabase
       .from("holdings")
@@ -905,6 +1381,18 @@ export async function getPortfolioData(): Promise<
       .select("*")
       .eq("user_id", base.userId)
       .in("data_type", ["quote", "fx"]),
+    base.supabase
+      .from("decision_scores")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("calculated_at", { ascending: false })
+      .limit(1000),
+    base.supabase
+      .from("price_zones")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id),
   ]);
 
   const rawHoldings = (holdingRows ?? []).map((row) =>
@@ -949,7 +1437,11 @@ export async function getPortfolioData(): Promise<
     portfolios: base.portfolios,
     activePortfolio: base.activePortfolio,
     brokerAccounts: base.brokerAccounts,
-    holdings: enrichHoldings(valuation.holdings, summary.totalValue),
+    holdings: attachDecisionViews({
+      holdings: enrichHoldings(valuation.holdings, summary.totalValue),
+      scoreRows: (decisionRows ?? []) as Record<string, unknown>[],
+      zoneRows: (zoneRows ?? []) as Record<string, unknown>[],
+    }),
     summary,
     marketDataSettings,
   };
@@ -969,6 +1461,7 @@ export async function getStockDetailData(symbol: string): Promise<
   > & {
     holding: WorkspaceData["holdings"][number] | null;
     transactions: Transaction[];
+    decisionEvents: DecisionEventView[];
   }
 > {
   const base = await getWorkspaceBase();
@@ -992,6 +1485,7 @@ export async function getStockDetailData(symbol: string): Promise<
       transactions: preview.transactions.filter(
         (transaction) => transaction.symbol?.toUpperCase() === normalizedSymbol
       ),
+      decisionEvents: [],
     };
   }
 
@@ -1003,6 +1497,9 @@ export async function getStockDetailData(symbol: string): Promise<
     { data: settingsRows },
     { data: cashOverrideRows },
     { data: marketRows },
+    { data: decisionRows },
+    { data: zoneRows },
+    { data: eventRows },
   ] = await Promise.all([
     base.supabase
       .from("holdings")
@@ -1047,6 +1544,28 @@ export async function getStockDetailData(symbol: string): Promise<
       .select("*")
       .eq("user_id", base.userId)
       .in("data_type", ["quote", "fx"]),
+    base.supabase
+      .from("decision_scores")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .eq("symbol", normalizedSymbol)
+      .order("calculated_at", { ascending: false })
+      .limit(25),
+    base.supabase
+      .from("price_zones")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .eq("symbol", normalizedSymbol),
+    base.supabase
+      .from("decision_events")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .eq("symbol", normalizedSymbol)
+      .order("created_at", { ascending: false })
+      .limit(20),
   ]);
 
   const marketDataSettings = mapMarketDataSettings(
@@ -1090,7 +1609,11 @@ export async function getStockDetailData(symbol: string): Promise<
         ? "Manual cash override + broker snapshot"
         : "Broker cash snapshot";
   summary.dataStatus = valuation.status;
-  const holdings = enrichHoldings(valuation.holdings, summary.totalValue);
+  const holdings = attachDecisionViews({
+    holdings: enrichHoldings(valuation.holdings, summary.totalValue),
+    scoreRows: (decisionRows ?? []) as Record<string, unknown>[],
+    zoneRows: (zoneRows ?? []) as Record<string, unknown>[],
+  });
 
   return {
     isPreview: base.isPreview,
@@ -1107,6 +1630,9 @@ export async function getStockDetailData(symbol: string): Promise<
     transactions: (transactionRows ?? [])
       .map((row) => mapTransaction(row as Record<string, unknown>))
       .filter(isVisibleActivity),
+    decisionEvents: (eventRows ?? []).map((row) =>
+      mapDecisionEvent(row as Record<string, unknown>)
+    ),
   };
 }
 
@@ -1126,15 +1652,27 @@ export async function getStrategyData(): Promise<StrategyData> {
     };
   }
 
-  const { data: holdingRows } = await base.supabase
-    .from("holdings")
-    .select("*")
-    .eq("user_id", base.userId)
-    .eq("portfolio_id", base.activePortfolio.id)
-    .order("symbol", { ascending: true });
+  const [{ data: holdingRows }, { data: targetRows }] = await Promise.all([
+    base.supabase
+      .from("holdings")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("symbol", { ascending: true }),
+    base.supabase
+      .from("targets")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id),
+  ]);
+
+  const strategyHoldings = mergeTargetRowsIntoHoldings(
+    (holdingRows ?? []).map((row) => mapHolding(row as Record<string, unknown>)),
+    (targetRows ?? []) as Record<string, unknown>[]
+  );
 
   const summary = computePortfolioSummary(
-    (holdingRows ?? []).map((row) => mapHolding(row as Record<string, unknown>)),
+    strategyHoldings,
     [],
     base.activePortfolio.baseCurrency
   );
@@ -1146,10 +1684,7 @@ export async function getStrategyData(): Promise<StrategyData> {
     portfolios: base.portfolios,
     activePortfolio: base.activePortfolio,
     brokerAccounts: base.brokerAccounts,
-    holdings: enrichHoldings(
-      (holdingRows ?? []).map((row) => mapHolding(row as Record<string, unknown>)),
-      summary.totalValue
-    ),
+    holdings: enrichHoldings(strategyHoldings, summary.totalValue),
   };
 }
 
@@ -1168,11 +1703,17 @@ export async function getSettingsData(): Promise<SettingsData> {
       marketDataSettings: DEFAULT_MARKET_SETTINGS,
       apiKeys: [],
       cashOverrides: [],
+      symbolMappings: [],
     };
   }
 
-  const [{ data: settingsRows }, { data: keyRows }, { data: overrideRows }] =
-    await Promise.all([
+  const [
+    { data: settingsRows },
+    { data: keyRows },
+    { data: overrideRows },
+    { data: mappingRows },
+    { data: holdingRows },
+  ] = await Promise.all([
       base.supabase
         .from("market_data_settings")
         .select("*")
@@ -1189,7 +1730,29 @@ export async function getSettingsData(): Promise<SettingsData> {
         .select("*")
         .eq("user_id", base.userId)
         .eq("portfolio_id", base.activePortfolio.id),
+      base.supabase
+        .from("symbol_mappings")
+        .select("*")
+        .eq("user_id", base.userId),
+      base.supabase
+        .from("holdings")
+        .select("symbol")
+        .eq("user_id", base.userId)
+        .order("symbol", { ascending: true }),
     ]);
+  const mappingBySymbol = new Map(
+    (mappingRows ?? []).map((row) => [
+      String((row as Record<string, unknown>).internal_symbol ?? "").toUpperCase(),
+      row as Record<string, unknown>,
+    ])
+  );
+  const symbols = Array.from(
+    new Set(
+      (holdingRows ?? [])
+        .map((row) => String((row as Record<string, unknown>).symbol ?? "").toUpperCase())
+        .filter(Boolean)
+    )
+  );
 
   return {
     isPreview: base.isPreview,
@@ -1207,6 +1770,9 @@ export async function getSettingsData(): Promise<SettingsData> {
     cashOverrides: (overrideRows ?? []).map((row) =>
       mapCashOverride(row as Record<string, unknown>)
     ),
+    symbolMappings: symbols.map((symbol) =>
+      mapSymbolMappingStatus(symbol, mappingBySymbol.get(symbol))
+    ),
   };
 }
 
@@ -1221,6 +1787,7 @@ export async function getActivityData(): Promise<
     | "brokerAccounts"
     | "transactions"
   >
+  & { decisionEvents: DecisionEventView[] }
 > {
   const base = await getWorkspaceBase();
 
@@ -1234,16 +1801,26 @@ export async function getActivityData(): Promise<
       activePortfolio: preview.activePortfolio,
       brokerAccounts: preview.brokerAccounts,
       transactions: preview.transactions,
+      decisionEvents: [],
     };
   }
 
-  const { data: transactionRows } = await base.supabase
-    .from("transactions")
-    .select("*")
-    .eq("user_id", base.userId)
-    .eq("portfolio_id", base.activePortfolio.id)
-    .order("occurred_at", { ascending: false })
-    .limit(250);
+  const [{ data: transactionRows }, { data: eventRows }] = await Promise.all([
+    base.supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("occurred_at", { ascending: false })
+      .limit(250),
+    base.supabase
+      .from("decision_events")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("created_at", { ascending: false })
+      .limit(100),
+  ]);
 
   return {
     isPreview: base.isPreview,
@@ -1255,5 +1832,8 @@ export async function getActivityData(): Promise<
     transactions: (transactionRows ?? [])
       .map((row) => mapTransaction(row as Record<string, unknown>))
       .filter(isVisibleActivity),
+    decisionEvents: (eventRows ?? []).map((row) =>
+      mapDecisionEvent(row as Record<string, unknown>)
+    ),
   };
 }

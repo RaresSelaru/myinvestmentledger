@@ -21,9 +21,16 @@ import {
 } from "@/components/ui/table";
 import { formatDateTime, formatMoneyPrecise, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { BrokerAccount, Transaction } from "@/lib/types";
+import type { BrokerAccount, DecisionEventView, Transaction } from "@/lib/types";
 
-type ActivityFilter = "all" | "trades" | "cash" | "income" | "costs" | "manual";
+type ActivityFilter =
+  | "all"
+  | "trades"
+  | "cash"
+  | "income"
+  | "costs"
+  | "manual"
+  | "decision";
 
 function activityGroup(transaction: Transaction): ActivityFilter {
   if (transaction.source === "manual") return "manual";
@@ -79,9 +86,11 @@ function detail(transaction: Transaction) {
 export function TransactionsTable({
   transactions,
   brokerAccounts,
+  decisionEvents = [],
 }: {
   transactions: Transaction[];
   brokerAccounts: BrokerAccount[];
+  decisionEvents?: DecisionEventView[];
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ActivityFilter>("all");
@@ -92,6 +101,10 @@ export function TransactionsTable({
   );
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
+
+    if (filter === "decision") {
+      return [];
+    }
 
     return transactions.filter((transaction) => {
       if (filter !== "all" && activityGroup(transaction) !== filter) {
@@ -113,6 +126,17 @@ export function TransactionsTable({
         .some((value) => String(value).toLowerCase().includes(needle));
     });
   }, [filter, query, transactions]);
+  const filteredDecisionEvents = useMemo(() => {
+    if (filter !== "all" && filter !== "decision") return [];
+    const needle = query.trim().toLowerCase();
+
+    return decisionEvents.filter((event) => {
+      if (!needle) return true;
+      return [event.symbol, event.eventType, event.reason, event.summary]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(needle));
+    });
+  }, [decisionEvents, filter, query]);
 
   return (
     <div className="space-y-3">
@@ -137,6 +161,7 @@ export function TransactionsTable({
             <SelectItem value="income">Income</SelectItem>
             <SelectItem value="costs">Fees & taxes</SelectItem>
             <SelectItem value="manual">Manual</SelectItem>
+            <SelectItem value="decision">Decision events</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -156,7 +181,30 @@ export function TransactionsTable({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.length ? (
+              {filtered.length || filteredDecisionEvents.length ? (
+                <>
+                {filteredDecisionEvents.map((event) => (
+                  <TableRow key={`decision-${event.id}`}>
+                    <TableCell className="metric-tabular whitespace-normal text-xs leading-5">
+                      {formatDateTime(event.date)}
+                    </TableCell>
+                    <TableCell>Decision</TableCell>
+                    <TableCell className="font-medium">
+                      {event.symbol ?? "-"}
+                    </TableCell>
+                    <TableCell className="whitespace-normal text-muted-foreground">
+                      {event.summary}
+                    </TableCell>
+                    <TableCell className="text-right text-muted-foreground">-</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="rounded-full font-normal">
+                        Engine
+                      </Badge>
+                    </TableCell>
+                    <TableCell />
+                  </TableRow>
+                ))}
+                {filtered.length ? (
                 filtered.map((transaction) => {
                   const expanded = expandedId === transaction.id;
 
@@ -260,6 +308,8 @@ export function TransactionsTable({
                     </Fragment>
                   );
                 })
+                ) : null}
+                </>
               ) : (
                 <TableRow>
                   <TableCell

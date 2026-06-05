@@ -1,8 +1,7 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { StrategyTargetsForm } from "@/components/investments/strategy-targets-form";
 import { getStrategyData } from "@/lib/data";
 import { formatPercent } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type StrategyPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -23,9 +22,12 @@ export default async function StrategyPage({ searchParams }: StrategyPageProps) 
     ? workspace.holdings.reduce((total, holding) => total + holding.corePercent, 0) /
       workspace.holdings.length
     : 0;
+  const configured = workspace.holdings.filter(
+    (holding) => holding.targetConfigured
+  ).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {first(params.error) ? (
         <p className="rounded-3xl border border-destructive/25 bg-destructive/10 px-5 py-4 text-sm text-destructive">
           {first(params.error)}
@@ -37,82 +39,55 @@ export default async function StrategyPage({ searchParams }: StrategyPageProps) 
         </p>
       ) : null}
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="flex flex-wrap gap-3">
         <MiniStat label="Symbols" value={String(workspace.holdings.length)} />
-        <MiniStat label="Target total" value={formatPercent(targetTotal)} />
+        <MiniStat label="Configured" value={`${configured}/${workspace.holdings.length}`} />
+        <MiniStat
+          label="Target total"
+          value={formatPercent(targetTotal)}
+          attention={targetTotal > 100}
+        />
         <MiniStat label="Average core" value={formatPercent(coreTotal)} />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[1.6fr_0.8fr]">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Target allocation</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <StrategyTargetsForm
-              portfolioId={workspace.activePortfolio.id}
-              holdings={workspace.holdings}
-              isLocked={workspace.isLocked}
-            />
-          </CardContent>
-        </Card>
-
-        <div className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Portfolio</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="rounded-3xl border border-border/70 bg-card p-5 shadow-sm">
-                <p className="font-semibold">{workspace.activePortfolio.name}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Base currency: {workspace.activePortfolio.baseCurrency}
-                </p>
-              </div>
-              <div className="rounded-3xl border border-border/70 bg-muted/35 p-5 text-sm text-muted-foreground">
-                Technical configuration, live prices, API keys, and cash overrides live in Settings.
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Broker accounts</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {workspace.brokerAccounts.map((account) => (
-                <div key={account.id} className="rounded-2xl border border-border/70 bg-card p-4 text-sm shadow-sm">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-medium">{account.name}</p>
-                    <span className="metric-tabular text-muted-foreground">
-                      {account.baseCurrency}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-muted-foreground">{account.broker}</p>
-                </div>
-              ))}
-              <Separator />
-              <p className="text-sm text-muted-foreground">
-                Internal transfer links are modeled in the database so movement
-                between broker accounts does not become a new consolidated deposit.
-              </p>
-            </CardContent>
-          </Card>
+      <section className="space-y-3">
+        <div>
+          <h2 className="text-base font-semibold">Target allocation</h2>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Set only the essentials first. Expand a symbol when you want to tune
+            anchors, zones, or decision inputs.
+          </p>
         </div>
+        <StrategyTargetsForm
+          portfolioId={workspace.activePortfolio.id}
+          holdings={workspace.holdings}
+          isLocked={workspace.isLocked}
+        />
       </section>
     </div>
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string }) {
+function MiniStat({
+  label,
+  value,
+  attention = false,
+}: {
+  label: string;
+  value: string;
+  attention?: boolean;
+}) {
   return (
-    <Card>
-      <CardContent className="p-4">
-        <p className="text-xs uppercase tracking-wide text-muted-foreground">
-          {label}
-        </p>
-        <p className="mt-2 metric-tabular text-2xl font-semibold">{value}</p>
-      </CardContent>
-    </Card>
+    <div className="rounded-full border border-border/70 bg-card px-4 py-2 shadow-sm">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span
+        className={cn(
+          "ml-2 metric-tabular text-sm font-semibold",
+          attention ? "text-rose-700 dark:text-rose-300" : "text-foreground"
+        )}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

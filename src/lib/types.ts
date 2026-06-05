@@ -25,6 +25,143 @@ export type MarketDataProviderName =
   | "alpha_vantage"
   | "twelve_data";
 
+export type DecisionRole = "core" | "satellite" | "speculative";
+
+export type CompanyType =
+  | "profitable_growth"
+  | "high_growth_unprofitable"
+  | "speculative_prerevenue"
+  | "industrial_infrastructure"
+  | "cyclical_semiconductor"
+  | "banks_financials"
+  | "commodity_exposed";
+
+export type ZoneMode = "auto" | "manual" | "locked" | "suggested";
+
+export type ConfidenceLabel = "high" | "medium" | "low";
+
+export type DecisionZoneLabel =
+  | "strong_accumulation"
+  | "light_accumulation"
+  | "hold"
+  | "trim_review"
+  | "strong_trim"
+  | "exit_review"
+  | "needs_setup";
+
+export type DecisionScoreKind =
+  | "accumulation"
+  | "hold"
+  | "trim"
+  | "liquidationRisk"
+  | "portfolioFit";
+
+export type DecisionScorePoint = {
+  rawScore: number;
+  finalScore: number;
+};
+
+export type DecisionDriverView = {
+  label: string;
+  value: string;
+  score?: number;
+};
+
+export type DecisionGateView = {
+  name: string;
+  active: boolean;
+  label: string;
+  effect: string;
+};
+
+export type RecentActivitySummary = {
+  latestBuy: Transaction | null;
+  latestSell: Transaction | null;
+  buys30d: number;
+  buys60d: number;
+  buys90d: number;
+  averageRecentBuyPrice: number | null;
+  recentBuyInsideAccumulationZone: boolean | null;
+  recentSellInsideTrimZone: boolean | null;
+  allocationAfterRecentActivity: number;
+  maxAllocationNearOrExceeded: boolean;
+  lastActivityConsideredAt: string | null;
+};
+
+export type PriceZoneView = {
+  symbol: string;
+  zoneMode: ZoneMode;
+  currentZone: DecisionZoneLabel;
+  strongAccumulation: number | null;
+  lightAccumulation: number | null;
+  holdLow: number | null;
+  holdHigh: number | null;
+  trimReview: number | null;
+  strongTrim: number | null;
+  exitReview: number | null;
+  currentPrice: number | null;
+  manualBuyAnchor: number | null;
+  manualTrimAnchor: number | null;
+  confidenceLabel: ConfidenceLabel;
+  source: "manual" | "calculated" | "provisional";
+  lastRecalculatedAt: string | null;
+  recalculationReason: string | null;
+  suggestedZones?: PriceZoneView | null;
+};
+
+export type DecisionScoreView = {
+  symbol: string;
+  calculationVersion: string;
+  calculatedAt: string;
+  scores: Record<DecisionScoreKind, DecisionScorePoint>;
+  confidenceScore: number;
+  confidenceLabel: ConfidenceLabel;
+  positiveDrivers: DecisionDriverView[];
+  negativeDrivers: DecisionDriverView[];
+  gates: DecisionGateView[];
+  missingData: {
+    critical: string[];
+    nonCritical: string[];
+  };
+  staleData: string[];
+  interpretation: DecisionZoneLabel;
+  recentActivity: RecentActivitySummary | null;
+  priceZone: PriceZoneView | null;
+};
+
+export type DecisionCandidateView = {
+  kind: "accumulation" | "trim";
+  symbol: string;
+  companyName: string | null;
+  score: number;
+  currentZone: DecisionZoneLabel;
+  reason: string;
+  confidenceLabel: ConfidenceLabel;
+  gateLabels: string[];
+};
+
+export type DecisionCockpit = {
+  accumulationCandidates: DecisionCandidateView[];
+  trimCandidates: DecisionCandidateView[];
+  setup: {
+    missingTargetAllocation: number;
+    invalidCoreSatelliteSplit: number;
+    missingCompanyType: number;
+    missingThesisScore: number;
+    missingPriceZones: number;
+    staleCalculations: number;
+  };
+};
+
+export type DecisionEventView = {
+  id: string;
+  date: string;
+  symbol: string | null;
+  eventType: string;
+  reason: string | null;
+  summary: string;
+};
+
 export type Portfolio = {
   id: string;
   name: string;
@@ -80,6 +217,19 @@ export type Holding = {
   targetSellPrice: number | null;
   corePercent: number;
   satellitePercent: number;
+  role?: DecisionRole | null;
+  companyType?: CompanyType | null;
+  theme?: string | null;
+  zoneMode?: ZoneMode;
+  manualFairValue?: number | null;
+  manualBuyAnchor?: number | null;
+  manualTrimAnchor?: number | null;
+  thesisIntegrityScore?: number | null;
+  catalystQualityScore?: number | null;
+  themeStrengthScore?: number | null;
+  valueChainCriticalityScore?: number | null;
+  macroUncertaintyScore?: number | null;
+  qualitativeComment?: string | null;
   updatedAt: string;
   sourceReferences?: SourceReference[];
 };
@@ -89,6 +239,9 @@ export type HoldingView = Holding & {
   investedAllocation: number;
   drift: number;
   plPercent: number;
+  targetConfigured?: boolean;
+  decisionScore?: DecisionScoreView | null;
+  priceZone?: PriceZoneView | null;
 };
 
 export type PortfolioSummary = {
@@ -145,6 +298,16 @@ export type BrokerCashOverride = {
   amount: number;
   currency: CurrencyCode;
   comment: string | null;
+};
+
+export type SymbolMappingStatus = {
+  internalSymbol: string;
+  provider: string | null;
+  providerSymbol: string | null;
+  exchange: string | null;
+  currency: CurrencyCode | null;
+  assetType: string | null;
+  verified: boolean;
 };
 
 export type Candidate = {
@@ -230,6 +393,7 @@ export type WorkspaceData = {
   marketDataSettings?: MarketDataSettings;
   accumulationCandidates: Candidate[];
   trimmingCandidates: Candidate[];
+  decisionCockpit: DecisionCockpit;
 };
 
 export type StrategyData = Pick<
@@ -255,6 +419,7 @@ export type SettingsData = Pick<
   marketDataSettings: MarketDataSettings;
   apiKeys: MarketDataApiKeyStatus[];
   cashOverrides: BrokerCashOverride[];
+  symbolMappings: SymbolMappingStatus[];
 };
 
 export type WorkspaceShellData = Pick<

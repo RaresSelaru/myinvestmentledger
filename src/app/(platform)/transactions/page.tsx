@@ -38,6 +38,7 @@ export default async function TransactionsPage({
       <TransactionsTable
         transactions={workspace.transactions}
         brokerAccounts={workspace.brokerAccounts}
+        decisionEvents={workspace.decisionEvents}
       />
     </div>
   );

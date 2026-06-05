@@ -1,0 +1,87 @@
+import type { CompanyType, DecisionRole } from "@/lib/types";
+
+export const DECISION_CONFIG = {
+  neutralScore: 50,
+  confidence: {
+    lowCap: 45,
+    mediumCap: 72,
+    candidateMinimum: 55,
+  },
+  gates: {
+    thesisBrokenScore: 30,
+    weakEarningsScore: 35,
+    liquidityBalanceSheetScore: 30,
+    speculativePortfolioCapPct: 15,
+    nearMaxAllocationPct: 90,
+  },
+  candidateEligibility: {
+    accumulationScore: 65,
+    trimScore: 65,
+    exitRiskScore: 75,
+  },
+  scores: {
+    accumulation: {
+      thesisIntegrityScore: 0.18,
+      earningsQualityScore: 0.1,
+      balanceSheetResilience: 0.1,
+      valuationAttractivenessScore: 0.16,
+      priceDislocationQuality: 0.16,
+      allocationGapScore: 0.18,
+      portfolioRoleFit: 0.12,
+    },
+    hold: {
+      thesisIntegrityScore: 0.22,
+      earningsQualityScore: 0.14,
+      balanceSheetResilience: 0.14,
+      portfolioRoleFit: 0.2,
+      valuationAttractivenessScore: 0.12,
+      priceDislocationQuality: 0.08,
+      concentrationRelief: 0.1,
+    },
+    trim: {
+      valuationPressureScore: 0.3,
+      concentrationPressure: 0.28,
+      allocationExcessScore: 0.22,
+      satelliteRiskScore: 0.1,
+      thesisWeaknessScore: 0.1,
+    },
+    liquidationRisk: {
+      thesisWeaknessScore: 0.34,
+      earningsWeaknessScore: 0.2,
+      balanceSheetWeaknessScore: 0.22,
+      concentrationPressure: 0.12,
+      speculativeRiskScore: 0.12,
+    },
+    portfolioFit: {
+      allocationFit: 0.35,
+      roleFit: 0.3,
+      concentrationFit: 0.2,
+      confidenceFit: 0.15,
+    },
+  },
+  zones: {
+    strongAccumulationDiscountPct: 10,
+    lightAccumulationDiscountPct: 3,
+    holdBufferPct: 8,
+    trimReviewPremiumPct: 0,
+    strongTrimPremiumPct: 8,
+    provisionalStrongAccumulationPct: 85,
+    provisionalLightAccumulationPct: 95,
+    provisionalTrimPct: 115,
+    provisionalStrongTrimPct: 130,
+  },
+  roleFit: {
+    core: 85,
+    satellite: 70,
+    speculative: 55,
+  } satisfies Record<DecisionRole, number>,
+  companyTypeRisk: {
+    profitable_growth: 70,
+    high_growth_unprofitable: 55,
+    speculative_prerevenue: 35,
+    industrial_infrastructure: 65,
+    cyclical_semiconductor: 55,
+    banks_financials: 60,
+    commodity_exposed: 50,
+  } satisfies Record<CompanyType, number>,
+};

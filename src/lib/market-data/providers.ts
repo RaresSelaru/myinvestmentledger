@@ -1,9 +1,15 @@
 import type {
   CompanyProfile,
   Fundamentals,
+  FinancialDataProvider,
+  FinancialRatios,
+  FinancialStatementRow,
   FxRate,
+  KeyMetrics,
   MarketDataProvider,
   MarketQuote,
+  PricePoint,
+  SymbolSearchResult,
 } from "@/lib/market-data/types";
 import type { CurrencyCode } from "@/lib/types";
 import type { MarketDataProviderName } from "@/lib/types";
@@ -285,4 +291,37 @@ export function createProviderByName(
   if (provider === "fmp") return createFmpProvider(apiKey);
   if (provider === "alpha_vantage") return createAlphaVantageProvider(apiKey);
   return createTwelveDataProvider(apiKey);
+}
+
+export function createMockFinancialDataProvider(): FinancialDataProvider {
+  return {
+    name: "mock",
+    async getQuote(): Promise<MarketQuote | null> {
+      return null;
+    },
+    async getPriceHistory(): Promise<PricePoint[]> {
+      return [];
+    },
+    async getCompanyProfile(): Promise<CompanyProfile | null> {
+      return null;
+    },
+    async getFinancialStatements(): Promise<FinancialStatementRow[]> {
+      return [];
+    },
+    async getFinancialRatios(): Promise<FinancialRatios | null> {
+      return null;
+    },
+    async getKeyMetrics(): Promise<KeyMetrics | null> {
+      return null;
+    },
+    async getFundamentals(): Promise<Fundamentals | null> {
+      return null;
+    },
+    async getFxRate(): Promise<FxRate | null> {
+      return null;
+    },
+    async searchSymbol(): Promise<SymbolSearchResult[]> {
+      return [];
+    },
+  };
 }

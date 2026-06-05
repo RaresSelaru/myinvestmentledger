@@ -3,7 +3,14 @@ import {
   enrichHoldings,
   rankCandidates,
 } from "@/lib/finance";
-import type { BrokerAccount, Holding, Portfolio, Transaction, WorkspaceData } from "@/lib/types";
+import type {
+  BrokerAccount,
+  DecisionCockpit,
+  Holding,
+  Portfolio,
+  Transaction,
+  WorkspaceData,
+} from "@/lib/types";
 
 const portfolio: Portfolio = {
   id: "preview-portfolio",
@@ -199,6 +206,18 @@ export function getPreviewWorkspaceData(): WorkspaceData {
       },
     ].sort((a, b) => b.marketValue - a.marketValue),
   };
+  const decisionCockpit: DecisionCockpit = {
+    accumulationCandidates: [],
+    trimCandidates: [],
+    setup: {
+      missingTargetAllocation: 0,
+      invalidCoreSatelliteSplit: 0,
+      missingCompanyType: holdings.length,
+      missingThesisScore: holdings.length,
+      missingPriceZones: holdings.length,
+      staleCalculations: holdings.length,
+    },
+  };
 
   return {
     isPreview: true,
@@ -213,5 +232,6 @@ export function getPreviewWorkspaceData(): WorkspaceData {
     accountOverview,
     accumulationCandidates: rankCandidates(holdings, "accumulation"),
     trimmingCandidates: rankCandidates(holdings, "trimming"),
+    decisionCockpit,
   };
 }

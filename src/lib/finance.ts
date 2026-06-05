@@ -47,6 +47,7 @@ export function enrichHoldings(holdings: Holding[], totalValue: number) {
       investedAllocation,
       drift: calculateDrift(actualAllocation, holding.targetAllocation),
       plPercent: calculatePlPercent(holding.marketValue, holding.costBasis),
+      targetConfigured: holding.targetAllocation > 0,
     };
   });
 }

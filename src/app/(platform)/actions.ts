@@ -23,6 +23,11 @@ import {
   createProviderByName,
 } from "@/lib/market-data/providers";
 import { MarketDataService } from "@/lib/market-data/service";
+import {
+  recalculateDecisionEngineForPortfolio,
+  recalculateDecisionEngineForSymbol,
+  refreshDecisionReadinessForPortfolio,
+} from "@/lib/decision/readiness";
 import { SupabaseImportRepository } from "@/lib/import/supabase-import-repository";
 import {
   commitXtbImport,
@@ -156,7 +161,7 @@ async function ensurePortfolioAccess(
 ) {
   const { data, error } = await supabase
     .from("portfolios")
-    .select("id")
+    .select("id, base_currency")
     .eq("user_id", userId)
     .eq("id", portfolioId)
     .maybeSingle();
@@ -164,6 +169,11 @@ async function ensurePortfolioAccess(
   if (error || !data?.id) {
     throw error ?? new Error("Portfolio not found.");
   }
+
+  return {
+    id: String(data.id),
+    baseCurrency: String(data.base_currency ?? "RON"),
+  };
 }
 
 async function storedProviderKey(
@@ -223,7 +233,7 @@ async function refreshQuotesForUserHoldings({
   userId: string;
   portfolioId: string;
 }) {
-  await ensurePortfolioAccess(supabase, userId, portfolioId);
+  const portfolio = await ensurePortfolioAccess(supabase, userId, portfolioId);
 
   const [{ data: settingRows }, { data: holdings }, { data: portfolioRows }] =
     await Promise.all([
@@ -288,6 +298,14 @@ async function refreshQuotesForUserHoldings({
       "No live quotes were returned. Check the API key or provider support for your symbols."
     );
   }
+
+  await refreshDecisionReadinessForPortfolio({
+    supabase,
+    userId,
+    portfolioId,
+    baseCurrency: portfolio.baseCurrency,
+    reason: "price_refresh",
+  });
 
   const baseCurrencies = Array.from(
     new Set(
@@ -449,7 +467,11 @@ export async function bulkSaveTargetsAction(formData: FormData) {
   }
 
   try {
-    await ensurePortfolioAccess(supabase, user.id, parsed.data.portfolioId);
+    const portfolio = await ensurePortfolioAccess(
+      supabase,
+      user.id,
+      parsed.data.portfolioId
+    );
 
     const payload = parsed.data.targets.map((target) => ({
       user_id: user.id,
@@ -465,6 +487,19 @@ export async function bulkSaveTargetsAction(formData: FormData) {
       satellite_percent: target.satellitePercent,
       core_pct: target.corePercent,
       satellite_pct: target.satellitePercent,
+      role: target.role,
+      company_type: target.companyType,
+      theme: target.theme,
+      zone_mode: target.zoneMode,
+      manual_fair_value: target.manualFairValue,
+      manual_buy_anchor: target.manualBuyAnchor,
+      manual_trim_anchor: target.manualTrimAnchor,
+      thesis_integrity_score: target.thesisIntegrityScore,
+      catalyst_quality_score: target.catalystQualityScore,
+      theme_strength_score: target.themeStrengthScore,
+      value_chain_criticality_score: target.valueChainCriticalityScore,
+      macro_uncertainty_score: target.macroUncertaintyScore,
+      qualitative_comment: target.qualitativeComment,
     }));
 
     const { error: targetError } = await supabase
@@ -490,6 +525,14 @@ export async function bulkSaveTargetsAction(formData: FormData) {
 
       if (holdingError) throw holdingError;
     }
+
+    await refreshDecisionReadinessForPortfolio({
+      supabase,
+      userId: user.id,
+      portfolioId: parsed.data.portfolioId,
+      baseCurrency: portfolio.baseCurrency,
+      reason: "strategy_save",
+    });
   } catch (error) {
     redirect(
       `/strategy?error=${encodeURIComponent(
@@ -696,6 +739,242 @@ export async function refreshLiveQuotesAction(portfolioId: string) {
   }
 }
 
+function cleanSymbol(value: FormDataEntryValue | null) {
+  return typeof value === "string" && value.trim()
+    ? value.trim().toUpperCase()
+    : null;
+}
+
+function cleanZoneMode(value: FormDataEntryValue | null) {
+  const mode = typeof value === "string" ? value : "";
+
+  if (["auto", "manual", "locked", "suggested"].includes(mode)) {
+    return mode as "auto" | "manual" | "locked" | "suggested";
+  }
+
+  return null;
+}
+
+async function revalidateDecisionPaths(symbol?: string | null) {
+  revalidatePath("/dashboard");
+  revalidatePath("/portfolio");
+  revalidatePath("/strategy");
+  revalidatePath("/transactions");
+
+  if (symbol) {
+    revalidatePath(`/portfolio/${symbol}`);
+  }
+}
+
+export async function recalculatePortfolioDecisionAction(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const parsed = refreshQuotesSchema.safeParse({
+    portfolioId: formData.get("portfolioId"),
+  });
+  const redirectTo = safeRedirect(formData.get("redirectTo"), "/dashboard");
+
+  if (!parsed.success) {
+    redirect(`${redirectTo}?error=Portfolio%20not%20found`);
+  }
+
+  try {
+    const portfolio = await ensurePortfolioAccess(
+      supabase,
+      user.id,
+      parsed.data.portfolioId
+    );
+    await recalculateDecisionEngineForPortfolio({
+      supabase,
+      userId: user.id,
+      portfolioId: parsed.data.portfolioId,
+      baseCurrency: portfolio.baseCurrency,
+      reason: "manual_recalculate",
+    });
+    await revalidateDecisionPaths();
+  } catch (error) {
+    redirect(
+      `${redirectTo}?error=${encodeURIComponent(
+        error instanceof Error ? error.message : "Could not recalculate"
+      )}`
+    );
+  }
+
+  redirect(`${redirectTo}?message=Decision%20engine%20recalculated`);
+}
+
+export async function recalculateSymbolDecisionAction(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const parsed = refreshQuotesSchema.safeParse({
+    portfolioId: formData.get("portfolioId"),
+  });
+  const symbol = cleanSymbol(formData.get("symbol"));
+  const redirectTo = safeRedirect(formData.get("redirectTo"), "/portfolio");
+
+  if (!parsed.success || !symbol) {
+    redirect(`${redirectTo}?error=Symbol%20not%20found`);
+  }
+
+  try {
+    const portfolio = await ensurePortfolioAccess(
+      supabase,
+      user.id,
+      parsed.data.portfolioId
+    );
+    await recalculateDecisionEngineForSymbol({
+      supabase,
+      userId: user.id,
+      portfolioId: parsed.data.portfolioId,
+      baseCurrency: portfolio.baseCurrency,
+      symbol,
+      reason: "manual_recalculate",
+    });
+    await revalidateDecisionPaths(symbol);
+  } catch (error) {
+    redirect(
+      `${redirectTo}?error=${encodeURIComponent(
+        error instanceof Error ? error.message : "Could not recalculate"
+      )}`
+    );
+  }
+
+  redirect(`${redirectTo}?message=${encodeURIComponent(`${symbol} recalculated`)}`);
+}
+
+export async function setZoneModeAction(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const parsed = refreshQuotesSchema.safeParse({
+    portfolioId: formData.get("portfolioId"),
+  });
+  const symbol = cleanSymbol(formData.get("symbol"));
+  const zoneMode = cleanZoneMode(formData.get("zoneMode"));
+  const redirectTo = safeRedirect(formData.get("redirectTo"), "/strategy");
+
+  if (!parsed.success || !symbol || !zoneMode) {
+    redirect(`${redirectTo}?error=Could%20not%20update%20zone%20mode`);
+  }
+
+  try {
+    const portfolio = await ensurePortfolioAccess(
+      supabase,
+      user.id,
+      parsed.data.portfolioId
+    );
+    const { error } = await supabase.from("targets").upsert(
+      {
+        user_id: user.id,
+        portfolio_id: parsed.data.portfolioId,
+        symbol,
+        zone_mode: zoneMode,
+      },
+      { onConflict: "user_id,portfolio_id,symbol" }
+    );
+
+    if (error) throw error;
+
+    await recalculateDecisionEngineForSymbol({
+      supabase,
+      userId: user.id,
+      portfolioId: parsed.data.portfolioId,
+      baseCurrency: portfolio.baseCurrency,
+      symbol,
+      reason:
+        zoneMode === "locked"
+          ? "lock_zones"
+          : zoneMode === "auto"
+            ? "reset_auto"
+            : "unlock_zones",
+    });
+    await revalidateDecisionPaths(symbol);
+  } catch (error) {
+    redirect(
+      `${redirectTo}?error=${encodeURIComponent(
+        error instanceof Error ? error.message : "Could not update zone mode"
+      )}`
+    );
+  }
+
+  redirect(`${redirectTo}?message=Zone%20mode%20updated`);
+}
+
+export async function applySuggestedZonesAction(formData: FormData) {
+  const { supabase, user } = await requireUser();
+  const parsed = refreshQuotesSchema.safeParse({
+    portfolioId: formData.get("portfolioId"),
+  });
+  const symbol = cleanSymbol(formData.get("symbol"));
+  const redirectTo = safeRedirect(formData.get("redirectTo"), "/portfolio");
+
+  if (!parsed.success || !symbol) {
+    redirect(`${redirectTo}?error=Could%20not%20apply%20suggested%20zones`);
+  }
+
+  try {
+    await ensurePortfolioAccess(supabase, user.id, parsed.data.portfolioId);
+    const { data: row, error } = await supabase
+      .from("price_zones")
+      .select("raw_outputs_json")
+      .eq("user_id", user.id)
+      .eq("portfolio_id", parsed.data.portfolioId)
+      .eq("symbol", symbol)
+      .maybeSingle();
+
+    if (error || !row) {
+      throw error ?? new Error("No suggested zones found.");
+    }
+
+    const rawOutputs =
+      typeof row.raw_outputs_json === "object" && row.raw_outputs_json !== null
+        ? (row.raw_outputs_json as Record<string, unknown>)
+        : {};
+    const suggested =
+      typeof rawOutputs.suggestedPriceZones === "object" &&
+      rawOutputs.suggestedPriceZones !== null
+        ? (rawOutputs.suggestedPriceZones as Record<string, unknown>)
+        : null;
+
+    if (!suggested) {
+      throw new Error("No suggested zones found.");
+    }
+
+    const { error: updateError } = await supabase
+      .from("price_zones")
+      .update({
+        strong_accumulation: suggested.strongAccumulation ?? null,
+        light_accumulation: suggested.lightAccumulation ?? null,
+        hold_low: suggested.holdLow ?? null,
+        hold_high: suggested.holdHigh ?? null,
+        trim_review: suggested.trimReview ?? null,
+        strong_trim: suggested.strongTrim ?? null,
+        zone_last_recalculated_at: new Date().toISOString(),
+        zone_recalculation_reason: "apply_suggested",
+      })
+      .eq("user_id", user.id)
+      .eq("portfolio_id", parsed.data.portfolioId)
+      .eq("symbol", symbol);
+
+    if (updateError) throw updateError;
+
+    await supabase.from("decision_events").insert({
+      user_id: user.id,
+      portfolio_id: parsed.data.portfolioId,
+      symbol,
+      event_type: "zones_applied",
+      reason: "apply_suggested",
+      next_json: suggested,
+      actor: "user",
+    });
+    await revalidateDecisionPaths(symbol);
+  } catch (error) {
+    redirect(
+      `${redirectTo}?error=${encodeURIComponent(
+        error instanceof Error ? error.message : "Could not apply suggested zones"
+      )}`
+    );
+  }
+
+  redirect(`${redirectTo}?message=Suggested%20zones%20applied`);
+}
+
 export async function saveBrokerCashOverrideAction(formData: FormData) {
   const { supabase, user } = await requireUser("/settings");
   const parsed = brokerCashOverrideSchema.safeParse({
@@ -754,6 +1033,13 @@ export async function addManualTransactionAction(formData: FormData) {
     redirect("/transactions?error=Could%20not%20save%20entry");
   }
 
+  const portfolio = await ensurePortfolioAccess(
+    supabase,
+    user.id,
+    parsed.data.portfolioId
+  );
+  const symbol = cleanOptionalString(parsed.data.symbol)?.toUpperCase() ?? null;
+
   await supabase.from("transactions").insert({
     user_id: user.id,
     portfolio_id: parsed.data.portfolioId,
@@ -762,7 +1048,7 @@ export async function addManualTransactionAction(formData: FormData) {
     occurred_at: new Date(parsed.data.date).toISOString(),
     type: parsed.data.type,
     transaction_type: parsed.data.type,
-    symbol: cleanOptionalString(parsed.data.symbol)?.toUpperCase(),
+    symbol,
     quantity: cleanOptionalNumber(parsed.data.quantity),
     price: cleanOptionalNumber(parsed.data.price),
     amount: parsed.data.amount,
@@ -773,8 +1059,20 @@ export async function addManualTransactionAction(formData: FormData) {
     comment: cleanOptionalString(parsed.data.comment),
   });
 
+  if (symbol) {
+    await recalculateDecisionEngineForSymbol({
+      supabase,
+      userId: user.id,
+      portfolioId: parsed.data.portfolioId,
+      baseCurrency: portfolio.baseCurrency,
+      symbol,
+      reason: "manual_transaction",
+    });
+  }
+
   revalidatePath("/transactions");
   revalidatePath("/dashboard");
+  revalidatePath("/portfolio");
   redirect("/transactions?message=Entry%20saved");
 }
 
@@ -1034,6 +1332,19 @@ export async function commitStagedImportAction(formData: FormData) {
       storageBucket,
       bytes,
       meta,
+    });
+    const portfolio = await ensurePortfolioAccess(
+      supabase,
+      user.id,
+      parsed.data.portfolioId
+    );
+
+    await recalculateDecisionEngineForPortfolio({
+      supabase,
+      userId: user.id,
+      portfolioId: parsed.data.portfolioId,
+      baseCurrency: portfolio.baseCurrency,
+      reason: "xtb_import",
     });
 
     if (stagedImportId) {

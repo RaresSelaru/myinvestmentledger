@@ -1,11 +1,13 @@
 import { Banknote, Layers3, LineChart, Target, Wallet } from "lucide-react";
 import { AccountOverviewCard } from "@/components/investments/account-overview-card";
-import { CandidateCard } from "@/components/investments/candidate-card";
+import { DecisionCandidateCard } from "@/components/investments/decision-candidate-card";
 import { EmptyState } from "@/components/investments/empty-state";
 import { ExplainNumber } from "@/components/investments/explain-number";
 import { LiveQuotesRefresher } from "@/components/investments/live-quotes-refresher";
 import { MetricCard } from "@/components/investments/metric-card";
+import { RecalculateZonesButton } from "@/components/investments/recalculate-zones-button";
 import { SignedPercent } from "@/components/investments/signed-value";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getWorkspaceData } from "@/lib/data";
 import { formatCurrency } from "@/lib/format";
 
@@ -117,15 +119,54 @@ export default async function DashboardPage() {
         <>
           <AccountOverviewCard overview={workspace.accountOverview} />
 
-          <section className="grid gap-4 lg:grid-cols-2">
-            <CandidateCard
-              title="Top 3 for accumulation"
-              candidates={workspace.accumulationCandidates}
+          <section className="grid gap-4 xl:grid-cols-[1fr_1fr_0.9fr]">
+            <DecisionCandidateCard
+              title="Accumulation candidates"
+              candidates={workspace.decisionCockpit.accumulationCandidates}
+              emptyText="No eligible accumulation candidates from current strategy inputs."
             />
-            <CandidateCard
-              title="Top 3 for trimming"
-              candidates={workspace.trimmingCandidates}
+            <DecisionCandidateCard
+              title="Trim review"
+              candidates={workspace.decisionCockpit.trimCandidates}
+              emptyText="No eligible trim candidates from current strategy inputs."
             />
+            <Card>
+              <CardHeader className="flex-row items-center justify-between gap-3 pb-3">
+                <CardTitle className="text-base">Decision setup</CardTitle>
+                <RecalculateZonesButton
+                  portfolioId={workspace.activePortfolio.id}
+                  redirectTo="/dashboard"
+                  label="Recalculate"
+                  disabled={workspace.isLocked}
+                />
+              </CardHeader>
+              <CardContent className="grid grid-cols-2 gap-3 text-sm">
+                <SetupMetric
+                  label="Missing target"
+                  value={workspace.decisionCockpit.setup.missingTargetAllocation}
+                />
+                <SetupMetric
+                  label="Split issues"
+                  value={workspace.decisionCockpit.setup.invalidCoreSatelliteSplit}
+                />
+                <SetupMetric
+                  label="Missing company type"
+                  value={workspace.decisionCockpit.setup.missingCompanyType}
+                />
+                <SetupMetric
+                  label="Missing thesis"
+                  value={workspace.decisionCockpit.setup.missingThesisScore}
+                />
+                <SetupMetric
+                  label="Missing zones"
+                  value={workspace.decisionCockpit.setup.missingPriceZones}
+                />
+                <SetupMetric
+                  label="Stale calculations"
+                  value={workspace.decisionCockpit.setup.staleCalculations}
+                />
+              </CardContent>
+            </Card>
           </section>
           <div className="ml-auto max-w-xl rounded-2xl border border-primary/15 bg-primary/8 px-4 py-3 text-xs leading-5 text-muted-foreground">
             Whole investment account overview: includes holdings and free cash
@@ -140,6 +181,15 @@ export default async function DashboardPage() {
           isLocked={workspace.isLocked}
         />
       )}
+    </div>
+  );
+}
+
+function SetupMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-2xl border border-border/70 bg-muted/25 p-3">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className="mt-1 metric-tabular text-lg font-semibold">{value}</p>
     </div>
   );
 }
