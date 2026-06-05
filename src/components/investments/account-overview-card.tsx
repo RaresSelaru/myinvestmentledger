@@ -129,17 +129,17 @@ export function AccountOverviewCard({
   const legendItems = overview.items.slice(0, 7);
 
   return (
-    <Card className="grid gap-0 overflow-hidden p-0 xl:grid-cols-[minmax(320px,0.8fr)_minmax(0,1.45fr)]">
-      <section className="min-w-0 border-border/70 p-6 xl:border-r">
+    <Card className="grid gap-0 overflow-hidden p-0 xl:grid-cols-[minmax(420px,0.9fr)_minmax(0,1.35fr)]">
+      <section className="min-w-0 border-border/70 p-5 xl:border-r">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">
+          <h2 className="text-lg font-semibold tracking-tight">
             Account overview
           </h2>
           <span className="subtle-chip">All portfolios</span>
         </div>
 
-        <div className="mt-8 grid gap-8 lg:grid-cols-[280px_1fr] xl:grid-cols-1 2xl:grid-cols-[280px_1fr]">
-          <div className="relative mx-auto size-[17rem] max-w-full">
+        <div className="mt-6 grid gap-5 lg:grid-cols-[240px_1fr] xl:grid-cols-1 2xl:grid-cols-[250px_1fr]">
+          <div className="relative mx-auto size-[15.5rem] max-w-full">
             <div
               className="absolute inset-0 rounded-full shadow-[inset_0_8px_24px_rgba(12,92,58,0.14)]"
               style={{ background: donutBackground(overview.items) }}
@@ -153,11 +153,11 @@ export function AccountOverviewCard({
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="min-w-0 space-y-2.5">
             {legendItems.map((item, index) => (
               <div
                 key={`${item.kind}-${item.symbol}`}
-                className="grid grid-cols-[12px_minmax(64px,1fr)_auto_auto] items-center gap-2 text-sm"
+                className="grid min-w-0 grid-cols-[12px_minmax(0,1fr)_minmax(82px,auto)] items-center gap-2 text-sm"
               >
                 <span
                   className="size-2.5 rounded-full"
@@ -167,29 +167,31 @@ export function AccountOverviewCard({
                 <span className="min-w-0 truncate font-medium">
                   {item.kind === "cash" ? "Cash" : item.symbol}
                 </span>
-                <span className="metric-tabular text-muted-foreground">
-                  {formatCurrency(item.marketValue, overview.currency)}
-                </span>
-                <span className="metric-tabular text-muted-foreground">
-                  {formatPercent(item.allocation)}
+                <span className="min-w-0 text-right text-xs leading-5 text-muted-foreground">
+                  <span className="block metric-tabular">
+                    {formatCurrency(item.marketValue, overview.currency)}
+                  </span>
+                  <span className="block metric-tabular">
+                    {formatPercent(item.allocation)}
+                  </span>
                 </span>
               </div>
             ))}
           </div>
         </div>
 
-        <div className="mt-8 rounded-3xl border border-primary/15 bg-primary/10 p-5">
+        <div className="mt-6 rounded-3xl border border-primary/15 bg-primary/10 p-4">
           <p className="font-medium">Whole investment account overview</p>
-          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
             Includes holdings and free cash from all portfolios. Cash uses the
             latest broker snapshot or manual override where available.
           </p>
         </div>
       </section>
 
-      <section className="min-w-0 p-6">
+      <section className="min-w-0 p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-semibold tracking-tight">Holdings</h2>
+          <h2 className="text-lg font-semibold tracking-tight">Holdings</h2>
           <Button asChild variant="outline" size="sm">
             <Link href="/portfolio">View all holdings</Link>
           </Button>
@@ -252,7 +254,7 @@ export function AccountOverviewCard({
                   key={`${item.kind}-${item.symbol}`}
                   className="border-b border-border/60 last:border-0"
                 >
-                  <td className="py-4 pr-3">
+                  <td className="py-3 pr-3">
                     <div className="flex items-center gap-3">
                       <AssetIcon item={item} index={index} />
                       <div className="min-w-0">
@@ -263,7 +265,7 @@ export function AccountOverviewCard({
                       </div>
                     </div>
                   </td>
-                  <td className="px-3 py-4">
+                  <td className="px-3 py-3">
                     <div className="flex min-w-32 items-center gap-3">
                       <span className="metric-tabular font-semibold text-emerald-800">
                         {formatPercent(item.allocation)}
@@ -276,16 +278,16 @@ export function AccountOverviewCard({
                       </span>
                     </div>
                   </td>
-                  <td className="px-3 py-4 text-right metric-tabular font-semibold">
+                  <td className="px-3 py-3 text-right metric-tabular font-semibold">
                     {formatCurrency(item.marketValue, overview.currency)}
                   </td>
-                  <td className="hidden px-3 py-4 text-right 2xl:table-cell">
+                  <td className="hidden px-3 py-3 text-right 2xl:table-cell">
                     <MoneyDelta
                       value={item.unrealizedPl}
                       currency={overview.currency}
                     />
                   </td>
-                  <td className="px-3 py-4 text-right">
+                  <td className="px-3 py-3 text-right">
                     <PercentDelta value={item.plPercent} />
                   </td>
                 </tr>

@@ -4,7 +4,6 @@ import { CandidateCard } from "@/components/investments/candidate-card";
 import { EmptyState } from "@/components/investments/empty-state";
 import { ExplainNumber } from "@/components/investments/explain-number";
 import { MetricCard } from "@/components/investments/metric-card";
-import { PageHeader } from "@/components/investments/page-header";
 import { SignedPercent } from "@/components/investments/signed-value";
 import { getWorkspaceData } from "@/lib/data";
 import { formatCurrency } from "@/lib/format";
@@ -17,12 +16,7 @@ export default async function DashboardPage() {
     : 0;
 
   return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Dashboard"
-        description="Portfolio clarity, allocation discipline, and traceable numbers."
-      />
-
+    <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className="subtle-chip">
           Valuation: {summary.valuationSource ?? "XTB snapshot"}
@@ -35,7 +29,7 @@ export default async function DashboardPage() {
         </span>
       </div>
 
-      <section className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-4">
+      <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <MetricCard
           label="Total portfolio value"
           value={formatCurrency(summary.totalValue, summary.currency)}
