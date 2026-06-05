@@ -114,6 +114,30 @@ function isMissingDecisionSchemaError(error: unknown) {
   );
 }
 
+async function runOptionalDecisionRecalculation(
+  task: () => Promise<unknown>,
+  context: string
+) {
+  try {
+    await task();
+  } catch (error) {
+    if (!isMissingDecisionSchemaError(error)) {
+      throw error;
+    }
+
+    console.warn(
+      `[decision-engine] skipped ${context}`,
+      readableError(error, "Decision schema is not ready")
+    );
+  }
+}
+
+function decisionSchemaMissingRedirect(redirectTo: string) {
+  return `${redirectTo}?error=${encodeURIComponent(
+    "Decision engine schema is not applied on Supabase yet. Apply the latest migrations, then retry."
+  )}`;
+}
+
 function tagList(value: string | undefined) {
   return (value ?? "")
     .split(",")
@@ -348,13 +372,17 @@ async function refreshQuotesForUserHoldings({
     );
   }
 
-  await refreshDecisionReadinessForPortfolio({
-    supabase,
-    userId,
-    portfolioId,
-    baseCurrency: portfolio.baseCurrency,
-    reason: "price_refresh",
-  });
+  await runOptionalDecisionRecalculation(
+    () =>
+      refreshDecisionReadinessForPortfolio({
+        supabase,
+        userId,
+        portfolioId,
+        baseCurrency: portfolio.baseCurrency,
+        reason: "price_refresh",
+      }),
+    "price refresh recalculation"
+  );
 
   const baseCurrencies = Array.from(
     new Set(
@@ -533,6 +561,15 @@ export async function bulkSaveTargetsAction(formData: FormData) {
       core_percent: target.corePercent,
       satellite_percent: target.satellitePercent,
     }));
+    const targetCompatibilityPayload = parsed.data.targets.map((target) => ({
+      user_id: user.id,
+      portfolio_id: parsed.data.portfolioId,
+      symbol: target.symbol.toUpperCase(),
+      target_allocation_pct: target.targetAllocation,
+      max_allocation_pct: target.maxAllocation,
+      core_pct: target.corePercent,
+      satellite_pct: target.satellitePercent,
+    }));
     const decisionPayload = parsed.data.targets.map((target) => ({
       user_id: user.id,
       portfolio_id: parsed.data.portfolioId,
@@ -567,6 +604,19 @@ export async function bulkSaveTargetsAction(formData: FormData) {
       .upsert(basePayload, { onConflict: "user_id,portfolio_id,symbol" });
 
     if (targetError) throw targetError;
+
+    const { error: compatibilityTargetError } = await supabase
+      .from("targets")
+      .upsert(targetCompatibilityPayload, {
+        onConflict: "user_id,portfolio_id,symbol",
+      });
+
+    if (
+      compatibilityTargetError &&
+      !isMissingDecisionSchemaError(compatibilityTargetError)
+    ) {
+      throw compatibilityTargetError;
+    }
 
     const { error: decisionTargetError } = await supabase
       .from("targets")
@@ -871,6 +921,10 @@ export async function recalculatePortfolioDecisionAction(formData: FormData) {
     });
     await revalidateDecisionPaths();
   } catch (error) {
+    if (isMissingDecisionSchemaError(error)) {
+      redirect(decisionSchemaMissingRedirect(redirectTo));
+    }
+
     redirect(
       `${redirectTo}?error=${encodeURIComponent(
         error instanceof Error ? error.message : "Could not recalculate"
@@ -909,6 +963,10 @@ export async function recalculateSymbolDecisionAction(formData: FormData) {
     });
     await revalidateDecisionPaths(symbol);
   } catch (error) {
+    if (isMissingDecisionSchemaError(error)) {
+      redirect(decisionSchemaMissingRedirect(redirectTo));
+    }
+
     redirect(
       `${redirectTo}?error=${encodeURIComponent(
         error instanceof Error ? error.message : "Could not recalculate"
@@ -965,6 +1023,10 @@ export async function setZoneModeAction(formData: FormData) {
     });
     await revalidateDecisionPaths(symbol);
   } catch (error) {
+    if (isMissingDecisionSchemaError(error)) {
+      redirect(decisionSchemaMissingRedirect(redirectTo));
+    }
+
     redirect(
       `${redirectTo}?error=${encodeURIComponent(
         error instanceof Error ? error.message : "Could not update zone mode"
@@ -998,6 +1060,10 @@ export async function applySuggestedZonesAction(formData: FormData) {
       .maybeSingle();
 
     if (error || !row) {
+      if (error && isMissingDecisionSchemaError(error)) {
+        redirect(decisionSchemaMissingRedirect(redirectTo));
+      }
+
       throw error ?? new Error("No suggested zones found.");
     }
 
@@ -1044,6 +1110,10 @@ export async function applySuggestedZonesAction(formData: FormData) {
     });
     await revalidateDecisionPaths(symbol);
   } catch (error) {
+    if (isMissingDecisionSchemaError(error)) {
+      redirect(decisionSchemaMissingRedirect(redirectTo));
+    }
+
     redirect(
       `${redirectTo}?error=${encodeURIComponent(
         error instanceof Error ? error.message : "Could not apply suggested zones"
@@ -1139,14 +1209,18 @@ export async function addManualTransactionAction(formData: FormData) {
   });
 
   if (symbol) {
-    await recalculateDecisionEngineForSymbol({
-      supabase,
-      userId: user.id,
-      portfolioId: parsed.data.portfolioId,
-      baseCurrency: portfolio.baseCurrency,
-      symbol,
-      reason: "manual_transaction",
-    });
+    await runOptionalDecisionRecalculation(
+      () =>
+        recalculateDecisionEngineForSymbol({
+          supabase,
+          userId: user.id,
+          portfolioId: parsed.data.portfolioId,
+          baseCurrency: portfolio.baseCurrency,
+          symbol,
+          reason: "manual_transaction",
+        }),
+      "manual transaction recalculation"
+    );
   }
 
   revalidatePath("/transactions");
@@ -1418,13 +1492,17 @@ export async function commitStagedImportAction(formData: FormData) {
       parsed.data.portfolioId
     );
 
-    await recalculateDecisionEngineForPortfolio({
-      supabase,
-      userId: user.id,
-      portfolioId: parsed.data.portfolioId,
-      baseCurrency: portfolio.baseCurrency,
-      reason: "xtb_import",
-    });
+    await runOptionalDecisionRecalculation(
+      () =>
+        recalculateDecisionEngineForPortfolio({
+          supabase,
+          userId: user.id,
+          portfolioId: parsed.data.portfolioId,
+          baseCurrency: portfolio.baseCurrency,
+          reason: "xtb_import",
+        }),
+      "XTB import recalculation"
+    );
 
     if (stagedImportId) {
       await supabase

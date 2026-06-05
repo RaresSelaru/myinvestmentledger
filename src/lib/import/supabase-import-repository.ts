@@ -35,6 +35,50 @@ function nullableNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function syncedNumber({
+  preferred,
+  legacy,
+  fallback = 0,
+}: {
+  preferred: unknown;
+  legacy: unknown;
+  fallback?: number;
+}) {
+  const preferredNumber = nullableNumber(preferred);
+  const legacyNumber = nullableNumber(legacy);
+
+  if (
+    legacyNumber !== null &&
+    legacyNumber > 0 &&
+    (preferredNumber === null || preferredNumber === 0)
+  ) {
+    return legacyNumber;
+  }
+
+  return preferredNumber ?? legacyNumber ?? fallback;
+}
+
+function syncedNullableNumber({
+  preferred,
+  legacy,
+}: {
+  preferred: unknown;
+  legacy: unknown;
+}) {
+  const preferredNumber = nullableNumber(preferred);
+  const legacyNumber = nullableNumber(legacy);
+
+  if (
+    legacyNumber !== null &&
+    legacyNumber > 0 &&
+    (preferredNumber === null || preferredNumber === 0)
+  ) {
+    return legacyNumber;
+  }
+
+  return preferredNumber ?? legacyNumber;
+}
+
 function dbImportStatus(status: ImportResult["stats"]["status"]) {
   if (status === "completed") return "succeeded";
   if (status === "dry_run") return "pending";
@@ -170,10 +214,14 @@ function mapTransaction(row: Record<string, unknown>): Transaction {
 function mapTarget(row: Record<string, unknown>): TargetConfig {
   return {
     symbol: String(row.symbol),
-    targetAllocationPct: numberFrom(
-      row.target_allocation_pct ?? row.target_allocation
-    ),
-    maxAllocationPct: nullableNumber(row.max_allocation_pct ?? row.max_allocation),
+    targetAllocationPct: syncedNumber({
+      preferred: row.target_allocation_pct,
+      legacy: row.target_allocation,
+    }),
+    maxAllocationPct: syncedNullableNumber({
+      preferred: row.max_allocation_pct,
+      legacy: row.max_allocation,
+    }),
     corePct: numberFrom(row.core_pct ?? row.core_percent, 100),
     satellitePct: numberFrom(row.satellite_pct ?? row.satellite_percent),
     targetBuyPrice: nullableNumber(row.target_buy_price),

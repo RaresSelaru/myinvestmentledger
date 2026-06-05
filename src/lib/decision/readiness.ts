@@ -38,6 +38,50 @@ function nullableNumber(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function syncedNumber({
+  preferred,
+  legacy,
+  fallback = 0,
+}: {
+  preferred: unknown;
+  legacy: unknown;
+  fallback?: number;
+}) {
+  const preferredNumber = nullableNumber(preferred);
+  const legacyNumber = nullableNumber(legacy);
+
+  if (
+    legacyNumber !== null &&
+    legacyNumber > 0 &&
+    (preferredNumber === null || preferredNumber === 0)
+  ) {
+    return legacyNumber;
+  }
+
+  return preferredNumber ?? legacyNumber ?? fallback;
+}
+
+function syncedNullableNumber({
+  preferred,
+  legacy,
+}: {
+  preferred: unknown;
+  legacy: unknown;
+}) {
+  const preferredNumber = nullableNumber(preferred);
+  const legacyNumber = nullableNumber(legacy);
+
+  if (
+    legacyNumber !== null &&
+    legacyNumber > 0 &&
+    (preferredNumber === null || preferredNumber === 0)
+  ) {
+    return legacyNumber;
+  }
+
+  return preferredNumber ?? legacyNumber;
+}
+
 function nullableString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -233,13 +277,15 @@ function mergeTargetIntoHolding(holding: Holding, target: Row | undefined): Hold
 
   return {
     ...holding,
-    targetAllocation: numberFrom(
-      target.target_allocation_pct ?? target.target_allocation,
-      holding.targetAllocation
-    ),
-    maxAllocation: nullableNumber(
-      target.max_allocation_pct ?? target.max_allocation
-    ),
+    targetAllocation: syncedNumber({
+      preferred: target.target_allocation_pct,
+      legacy: target.target_allocation,
+      fallback: holding.targetAllocation,
+    }),
+    maxAllocation: syncedNullableNumber({
+      preferred: target.max_allocation_pct,
+      legacy: target.max_allocation,
+    }),
     targetBuyPrice: nullableNumber(target.target_buy_price),
     targetSellPrice: nullableNumber(target.target_sell_price),
     corePercent: numberFrom(target.core_pct ?? target.core_percent, holding.corePercent),

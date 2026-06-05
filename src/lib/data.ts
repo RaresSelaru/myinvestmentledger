@@ -116,6 +116,50 @@ function nullableNumberFrom(value: unknown) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function syncedNumberFrom({
+  preferred,
+  legacy,
+  fallback = 0,
+}: {
+  preferred: unknown;
+  legacy: unknown;
+  fallback?: number;
+}) {
+  const preferredNumber = nullableNumberFrom(preferred);
+  const legacyNumber = nullableNumberFrom(legacy);
+
+  if (
+    legacyNumber !== null &&
+    legacyNumber > 0 &&
+    (preferredNumber === null || preferredNumber === 0)
+  ) {
+    return legacyNumber;
+  }
+
+  return preferredNumber ?? legacyNumber ?? fallback;
+}
+
+function syncedNullableNumberFrom({
+  preferred,
+  legacy,
+}: {
+  preferred: unknown;
+  legacy: unknown;
+}) {
+  const preferredNumber = nullableNumberFrom(preferred);
+  const legacyNumber = nullableNumberFrom(legacy);
+
+  if (
+    legacyNumber !== null &&
+    legacyNumber > 0 &&
+    (preferredNumber === null || preferredNumber === 0)
+  ) {
+    return legacyNumber;
+  }
+
+  return preferredNumber ?? legacyNumber;
+}
+
 function nullableStringFrom(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -224,13 +268,15 @@ function mergeTargetRowsIntoHoldings(
 
     return {
       ...holding,
-      targetAllocation: numberFrom(
-        target.target_allocation_pct ?? target.target_allocation,
-        holding.targetAllocation
-      ),
-      maxAllocation: nullableNumberFrom(
-        target.max_allocation_pct ?? target.max_allocation
-      ),
+      targetAllocation: syncedNumberFrom({
+        preferred: target.target_allocation_pct,
+        legacy: target.target_allocation,
+        fallback: holding.targetAllocation,
+      }),
+      maxAllocation: syncedNullableNumberFrom({
+        preferred: target.max_allocation_pct,
+        legacy: target.max_allocation,
+      }),
       targetBuyPrice: nullableNumberFrom(target.target_buy_price),
       targetSellPrice: nullableNumberFrom(target.target_sell_price),
       corePercent: numberFrom(target.core_pct ?? target.core_percent, holding.corePercent),
