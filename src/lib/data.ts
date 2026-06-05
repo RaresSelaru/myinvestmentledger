@@ -752,6 +752,271 @@ export async function getWorkspaceData(): Promise<WorkspaceData> {
   };
 }
 
+export async function getPortfolioData(): Promise<
+  Pick<
+    WorkspaceData,
+    | "isPreview"
+    | "isLocked"
+    | "userEmail"
+    | "portfolios"
+    | "activePortfolio"
+    | "brokerAccounts"
+    | "holdings"
+    | "summary"
+  >
+> {
+  const base = await getWorkspaceBase();
+
+  if (base.isPreview || !base.supabase || !base.userId) {
+    const preview = getPreviewWorkspaceData();
+    return {
+      isPreview: preview.isPreview,
+      isLocked: preview.isLocked,
+      userEmail: preview.userEmail,
+      portfolios: preview.portfolios,
+      activePortfolio: preview.activePortfolio,
+      brokerAccounts: preview.brokerAccounts,
+      holdings: preview.holdings,
+      summary: preview.summary,
+    };
+  }
+
+  const [
+    { data: holdingRows },
+    { data: snapshotRows },
+    { data: settingsRows },
+    { data: cashOverrideRows },
+    { data: marketRows },
+  ] = await Promise.all([
+    base.supabase
+      .from("holdings")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("symbol", { ascending: true }),
+    base.supabase
+      .from("broker_account_snapshots")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("snapshot_at", { ascending: false }),
+    base.supabase
+      .from("market_data_settings")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .limit(1),
+    base.supabase
+      .from("broker_cash_overrides")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id),
+    base.supabase
+      .from("market_data_cache")
+      .select("*")
+      .eq("user_id", base.userId)
+      .in("data_type", ["quote", "fx"]),
+  ]);
+
+  const rawHoldings = (holdingRows ?? []).map((row) =>
+    mapHolding(row as Record<string, unknown>)
+  );
+  const marketDataSettings = mapMarketDataSettings(
+    (settingsRows?.[0] as Record<string, unknown> | undefined) ?? null
+  );
+  const valuation = applyLiveValuation({
+    holdings: rawHoldings,
+    marketRows: (marketRows ?? []) as Record<string, unknown>[],
+    baseCurrency: base.activePortfolio.baseCurrency,
+    settings: marketDataSettings,
+  });
+  const cashOverrides = (cashOverrideRows ?? []).map((row) =>
+    mapCashOverride(row as Record<string, unknown>)
+  );
+  const brokerCash = latestSnapshotCash(
+    (snapshotRows ?? []) as Record<string, unknown>[],
+    cashOverrides
+  );
+  const summary = computePortfolioSummary(
+    valuation.holdings,
+    [],
+    base.activePortfolio.baseCurrency,
+    { cash: brokerCash }
+  );
+  summary.valuationMode = marketDataSettings.valuationMode;
+  summary.valuationSource = valuation.source;
+  summary.cashSource =
+    brokerCash === null
+      ? "Ledger fallback"
+      : cashOverrides.length
+        ? "Manual cash override + broker snapshot"
+        : "Broker cash snapshot";
+  summary.dataStatus = valuation.status;
+
+  return {
+    isPreview: base.isPreview,
+    isLocked: base.isLocked,
+    userEmail: base.userEmail,
+    portfolios: base.portfolios,
+    activePortfolio: base.activePortfolio,
+    brokerAccounts: base.brokerAccounts,
+    holdings: enrichHoldings(valuation.holdings, summary.totalValue),
+    summary,
+  };
+}
+
+export async function getStockDetailData(symbol: string): Promise<
+  Pick<
+    WorkspaceData,
+    | "isPreview"
+    | "isLocked"
+    | "userEmail"
+    | "portfolios"
+    | "activePortfolio"
+    | "brokerAccounts"
+    | "summary"
+  > & {
+    holding: WorkspaceData["holdings"][number] | null;
+    transactions: Transaction[];
+  }
+> {
+  const base = await getWorkspaceBase();
+  const normalizedSymbol = symbol.toUpperCase();
+
+  if (base.isPreview || !base.supabase || !base.userId) {
+    const preview = getPreviewWorkspaceData();
+    return {
+      isPreview: preview.isPreview,
+      isLocked: preview.isLocked,
+      userEmail: preview.userEmail,
+      portfolios: preview.portfolios,
+      activePortfolio: preview.activePortfolio,
+      brokerAccounts: preview.brokerAccounts,
+      summary: preview.summary,
+      holding:
+        preview.holdings.find(
+          (holding) => holding.symbol.toUpperCase() === normalizedSymbol
+        ) ?? null,
+      transactions: preview.transactions.filter(
+        (transaction) => transaction.symbol?.toUpperCase() === normalizedSymbol
+      ),
+    };
+  }
+
+  const [
+    { data: holdingRows },
+    { data: transactionRows },
+    { data: snapshotRows },
+    { data: realizedRows },
+    { data: settingsRows },
+    { data: cashOverrideRows },
+    { data: marketRows },
+  ] = await Promise.all([
+    base.supabase
+      .from("holdings")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("symbol", { ascending: true }),
+    base.supabase
+      .from("transactions")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .eq("symbol", normalizedSymbol)
+      .order("occurred_at", { ascending: false })
+      .limit(80),
+    base.supabase
+      .from("broker_account_snapshots")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .order("snapshot_at", { ascending: false }),
+    base.supabase
+      .from("transactions")
+      .select("realized_pl")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .eq("symbol", normalizedSymbol)
+      .not("realized_pl", "is", null),
+    base.supabase
+      .from("market_data_settings")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id)
+      .limit(1),
+    base.supabase
+      .from("broker_cash_overrides")
+      .select("*")
+      .eq("user_id", base.userId)
+      .eq("portfolio_id", base.activePortfolio.id),
+    base.supabase
+      .from("market_data_cache")
+      .select("*")
+      .eq("user_id", base.userId)
+      .in("data_type", ["quote", "fx"]),
+  ]);
+
+  const marketDataSettings = mapMarketDataSettings(
+    (settingsRows?.[0] as Record<string, unknown> | undefined) ?? null
+  );
+  const rawHoldings = (holdingRows ?? []).map((row) =>
+    mapHolding(row as Record<string, unknown>)
+  );
+  const valuation = applyLiveValuation({
+    holdings: rawHoldings,
+    marketRows: (marketRows ?? []) as Record<string, unknown>[],
+    baseCurrency: base.activePortfolio.baseCurrency,
+    settings: marketDataSettings,
+  });
+  const cashOverrides = (cashOverrideRows ?? []).map((row) =>
+    mapCashOverride(row as Record<string, unknown>)
+  );
+  const brokerCash = latestSnapshotCash(
+    (snapshotRows ?? []) as Record<string, unknown>[],
+    cashOverrides
+  );
+  const realizedPl =
+    realizedRows?.length
+      ? realizedRows.reduce(
+          (total, row) => total + numberFrom((row as Record<string, unknown>).realized_pl),
+          0
+        )
+      : null;
+  const summary = computePortfolioSummary(
+    valuation.holdings,
+    [],
+    base.activePortfolio.baseCurrency,
+    { cash: brokerCash, realizedPl }
+  );
+  summary.valuationMode = marketDataSettings.valuationMode;
+  summary.valuationSource = valuation.source;
+  summary.cashSource =
+    brokerCash === null
+      ? "Ledger fallback"
+      : cashOverrides.length
+        ? "Manual cash override + broker snapshot"
+        : "Broker cash snapshot";
+  summary.dataStatus = valuation.status;
+  const holdings = enrichHoldings(valuation.holdings, summary.totalValue);
+
+  return {
+    isPreview: base.isPreview,
+    isLocked: base.isLocked,
+    userEmail: base.userEmail,
+    portfolios: base.portfolios,
+    activePortfolio: base.activePortfolio,
+    brokerAccounts: base.brokerAccounts,
+    summary,
+    holding:
+      holdings.find((holding) => holding.symbol.toUpperCase() === normalizedSymbol) ??
+      null,
+    transactions: (transactionRows ?? [])
+      .map((row) => mapTransaction(row as Record<string, unknown>))
+      .filter(isVisibleActivity),
+  };
+}
+
 export async function getStrategyData(): Promise<StrategyData> {
   const base = await getWorkspaceBase();
 

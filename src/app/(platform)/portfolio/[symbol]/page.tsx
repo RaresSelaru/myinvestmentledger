@@ -8,7 +8,7 @@ import { CoreSatelliteBar } from "@/components/investments/core-satellite-bar";
 import { ExplainNumber } from "@/components/investments/explain-number";
 import { PageHeader } from "@/components/investments/page-header";
 import { SignedPercent } from "@/components/investments/signed-value";
-import { getWorkspaceData } from "@/lib/data";
+import { getStockDetailData } from "@/lib/data";
 import {
   formatCurrency,
   formatMoneyPrecise,
@@ -22,10 +22,8 @@ type StockDetailPageProps = {
 
 export default async function StockDetailPage({ params }: StockDetailPageProps) {
   const { symbol } = await params;
-  const workspace = await getWorkspaceData();
-  const holding = workspace.holdings.find(
-    (item) => item.symbol.toLowerCase() === symbol.toLowerCase()
-  );
+  const workspace = await getStockDetailData(symbol);
+  const { holding } = workspace;
 
   if (!holding) {
     return (
@@ -45,9 +43,7 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
     );
   }
 
-  const transactions = workspace.transactions.filter(
-    (transaction) => transaction.symbol === holding.symbol
-  );
+  const transactions = workspace.transactions;
 
   if (workspace.isLocked) {
     return (

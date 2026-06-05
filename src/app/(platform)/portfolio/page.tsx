@@ -1,10 +1,10 @@
 import { EmptyState } from "@/components/investments/empty-state";
 import { PageHeader } from "@/components/investments/page-header";
 import { PortfolioHoldingsTable } from "@/components/investments/portfolio-holdings-table";
-import { getWorkspaceData } from "@/lib/data";
+import { getPortfolioData } from "@/lib/data";
 
 export default async function PortfolioPage() {
-  const workspace = await getWorkspaceData();
+  const workspace = await getPortfolioData();
 
   return (
     <div className="space-y-6">
