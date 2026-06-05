@@ -283,6 +283,51 @@ function payloadObject(row: Record<string, unknown>) {
     : {};
 }
 
+type MarketRowMatch = {
+  row: Record<string, unknown>;
+  isStale: boolean;
+};
+
+function updateMarketRowGroup(
+  groups: Map<string, { latest?: Record<string, unknown>; fresh?: Record<string, unknown> }>,
+  key: string,
+  row: Record<string, unknown>,
+  isFresh: boolean
+) {
+  const current = groups.get(key) ?? {};
+  const latest = newestRow(
+    [row, current.latest].filter(Boolean) as Record<string, unknown>[]
+  );
+  const fresh = isFresh
+    ? newestRow([row, current.fresh].filter(Boolean) as Record<string, unknown>[])
+    : current.fresh;
+
+  groups.set(key, { latest, fresh });
+}
+
+function pickMarketRow(
+  groups: Map<string, { latest?: Record<string, unknown>; fresh?: Record<string, unknown> }>,
+  keys: string[]
+): MarketRowMatch | null {
+  for (const key of keys) {
+    const group = groups.get(key.toUpperCase());
+
+    if (group?.fresh) {
+      return { row: group.fresh, isStale: false };
+    }
+  }
+
+  for (const key of keys) {
+    const group = groups.get(key.toUpperCase());
+
+    if (group?.latest) {
+      return { row: group.latest, isStale: true };
+    }
+  }
+
+  return null;
+}
+
 function applyLiveValuation(input: {
   holdings: Holding[];
   marketRows: Record<string, unknown>[];
@@ -302,37 +347,42 @@ function applyLiveValuation(input: {
   }
 
   const now = Date.now();
-  const quoteRows = new Map<string, Record<string, unknown>>();
-  const fxRows = new Map<string, Record<string, unknown>>();
+  const quoteRows = new Map<
+    string,
+    { latest?: Record<string, unknown>; fresh?: Record<string, unknown> }
+  >();
+  const fxRows = new Map<
+    string,
+    { latest?: Record<string, unknown>; fresh?: Record<string, unknown> }
+  >();
 
   for (const row of input.marketRows) {
     const expiresAt = new Date(String(row.expires_at ?? 0)).getTime();
     const isFresh = Number.isFinite(expiresAt) && expiresAt > now;
-
-    if (!isFresh) {
-      continue;
-    }
-
     const dataType = String(row.data_type ?? "quote");
     const symbol = String(row.symbol ?? "").toUpperCase();
 
     if (dataType === "quote") {
-      quoteRows.set(symbol, newestRow([row, quoteRows.get(symbol)].filter(Boolean) as Record<string, unknown>[]));
+      updateMarketRowGroup(quoteRows, symbol, row, isFresh);
     } else if (dataType === "fx") {
-      fxRows.set(symbol, newestRow([row, fxRows.get(symbol)].filter(Boolean) as Record<string, unknown>[]));
+      updateMarketRowGroup(fxRows, symbol, row, isFresh);
     }
   }
 
   let liveCount = 0;
+  let freshCount = 0;
+  let staleCount = 0;
   const holdings = input.holdings.map((holding) => {
-    const quoteRow = providerSymbolCandidates(holding.symbol)
-      .map((candidate) => quoteRows.get(candidate))
-      .find(Boolean);
+    const quoteMatch = pickMarketRow(
+      quoteRows,
+      providerSymbolCandidates(holding.symbol)
+    );
 
-    if (!quoteRow) {
+    if (!quoteMatch) {
       return holding;
     }
 
+    const quoteRow = quoteMatch.row;
     const payload = payloadObject(quoteRow);
     const quotePrice = numberFrom(payload.price ?? quoteRow.price, NaN);
     const quoteCurrency = String(payload.currency ?? quoteRow.currency ?? "USD");
@@ -344,8 +394,16 @@ function applyLiveValuation(input: {
     let convertedPrice = quotePrice;
 
     if (quoteCurrency.toUpperCase() !== input.baseCurrency.toUpperCase()) {
+      const fxMatch = pickMarketRow(fxRows, [
+        `${quoteCurrency}:${input.baseCurrency}`,
+      ]);
+
+      if (!fxMatch) {
+        return holding;
+      }
+
       const fxPayload = payloadObject(
-        fxRows.get(`${quoteCurrency}:${input.baseCurrency}`.toUpperCase()) ?? {}
+        fxMatch.row
       );
       const fxRate = numberFrom(fxPayload.rate, NaN);
 
@@ -354,9 +412,17 @@ function applyLiveValuation(input: {
       }
 
       convertedPrice = quotePrice * fxRate;
+      if (fxMatch.isStale) {
+        staleCount += 1;
+      }
     }
 
     liveCount += 1;
+    if (quoteMatch.isStale) {
+      staleCount += 1;
+    } else {
+      freshCount += 1;
+    }
     const marketValue = round(holding.quantity * convertedPrice, 2);
 
     return {
@@ -378,11 +444,17 @@ function applyLiveValuation(input: {
 
   return {
     holdings,
-    source: liveCount ? "Live quotes" : "XTB snapshot",
+    source: liveCount
+      ? staleCount
+        ? "Cached live quotes"
+        : "Live quotes"
+      : "XTB snapshot",
     status:
-      liveCount === input.holdings.length
+      liveCount === input.holdings.length && staleCount === 0
         ? ("live" as const)
-        : liveCount > 0
+        : liveCount > 0 && freshCount === 0
+          ? ("stale" as const)
+          : liveCount > 0
           ? ("partial" as const)
           : ("snapshot" as const),
   };
@@ -778,6 +850,7 @@ export async function getPortfolioData(): Promise<
     | "brokerAccounts"
     | "holdings"
     | "summary"
+    | "marketDataSettings"
   >
 > {
   const base = await getWorkspaceBase();
@@ -793,6 +866,7 @@ export async function getPortfolioData(): Promise<
       brokerAccounts: preview.brokerAccounts,
       holdings: preview.holdings,
       summary: preview.summary,
+      marketDataSettings: DEFAULT_MARKET_SETTINGS,
     };
   }
 
@@ -877,6 +951,7 @@ export async function getPortfolioData(): Promise<
     brokerAccounts: base.brokerAccounts,
     holdings: enrichHoldings(valuation.holdings, summary.totalValue),
     summary,
+    marketDataSettings,
   };
 }
 
@@ -890,6 +965,7 @@ export async function getStockDetailData(symbol: string): Promise<
     | "activePortfolio"
     | "brokerAccounts"
     | "summary"
+    | "marketDataSettings"
   > & {
     holding: WorkspaceData["holdings"][number] | null;
     transactions: Transaction[];
@@ -908,6 +984,7 @@ export async function getStockDetailData(symbol: string): Promise<
       activePortfolio: preview.activePortfolio,
       brokerAccounts: preview.brokerAccounts,
       summary: preview.summary,
+      marketDataSettings: DEFAULT_MARKET_SETTINGS,
       holding:
         preview.holdings.find(
           (holding) => holding.symbol.toUpperCase() === normalizedSymbol
@@ -1023,6 +1100,7 @@ export async function getStockDetailData(symbol: string): Promise<
     activePortfolio: base.activePortfolio,
     brokerAccounts: base.brokerAccounts,
     summary,
+    marketDataSettings,
     holding:
       holdings.find((holding) => holding.symbol.toUpperCase() === normalizedSymbol) ??
       null,

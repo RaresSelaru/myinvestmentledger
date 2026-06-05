@@ -125,11 +125,11 @@ export function AccountOverviewCard({
 }: {
   overview: AccountOverview;
 }) {
-  const visibleRows = overview.items.slice(0, 6);
+  const visibleRows = overview.items;
   const legendItems = overview.items;
 
   return (
-    <Card className="grid gap-0 overflow-hidden p-0 2xl:grid-cols-[minmax(520px,0.9fr)_minmax(720px,1.35fr)]">
+    <Card className="grid gap-0 overflow-hidden p-0 2xl:grid-cols-[minmax(640px,0.95fr)_minmax(760px,1.25fr)]">
       <section className="min-w-0 border-border/70 p-5 2xl:border-r">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">
@@ -138,7 +138,7 @@ export function AccountOverviewCard({
           <span className="subtle-chip">All portfolios</span>
         </div>
 
-        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(220px,260px)_minmax(190px,1fr)] 2xl:grid-cols-[minmax(220px,250px)_minmax(190px,1fr)]">
+        <div className="mt-6 grid gap-5 lg:grid-cols-[minmax(220px,260px)_minmax(220px,1fr)] 2xl:grid-cols-[minmax(220px,250px)_minmax(260px,1fr)]">
           <div className="relative mx-auto size-[15.5rem] max-w-full">
             <div
               className="absolute inset-0 rounded-full shadow-[inset_0_8px_24px_rgba(12,92,58,0.14)]"
@@ -153,7 +153,7 @@ export function AccountOverviewCard({
             </div>
           </div>
 
-          <div className="min-w-0 space-y-2.5 overflow-y-auto pr-1 2xl:max-h-[22rem]">
+          <div className="grid min-w-0 gap-x-4 gap-y-2.5 pr-1 sm:grid-cols-2 lg:grid-cols-1">
             {legendItems.map((item, index) => (
               <div
                 key={`${item.kind}-${item.symbol}`}

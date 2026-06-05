@@ -214,6 +214,110 @@ async function configuredMarketProviders(
   return providers;
 }
 
+async function refreshQuotesForUserHoldings({
+  supabase,
+  userId,
+  portfolioId,
+}: {
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+  userId: string;
+  portfolioId: string;
+}) {
+  await ensurePortfolioAccess(supabase, userId, portfolioId);
+
+  const [{ data: settingRows }, { data: holdings }, { data: portfolioRows }] =
+    await Promise.all([
+      supabase
+        .from("market_data_settings")
+        .select("preferred_provider, quote_refresh_interval_seconds")
+        .eq("user_id", userId)
+        .eq("portfolio_id", portfolioId)
+        .limit(1),
+      supabase
+        .from("holdings")
+        .select("symbol")
+        .eq("user_id", userId),
+      supabase
+        .from("portfolios")
+        .select("base_currency")
+        .eq("user_id", userId),
+    ]);
+  const preferredProvider = String(
+    settingRows?.[0]?.preferred_provider ?? "auto"
+  );
+  const quoteRefreshIntervalSeconds = Math.min(
+    3600,
+    Math.max(
+      60,
+      Number(settingRows?.[0]?.quote_refresh_interval_seconds ?? 120)
+    )
+  );
+  const providers = await configuredMarketProviders(
+    supabase,
+    userId,
+    preferredProvider
+  );
+
+  if (!providers.length) {
+    throw new Error("Configure at least one market data API key first.");
+  }
+
+  const symbols = Array.from(
+    new Set(
+      (holdings ?? [])
+        .map((row) => String(row.symbol ?? "").toUpperCase())
+        .filter(Boolean)
+    )
+  );
+
+  if (!symbols.length) {
+    throw new Error("No holdings to refresh.");
+  }
+
+  const service = new MarketDataService(
+    new SupabaseMarketDataCache(supabase, userId),
+    providers,
+    { quoteTtlMs: quoteRefreshIntervalSeconds * 1000 }
+  );
+  const quotes = (await service.refreshMarketData(symbols)).filter(
+    Boolean
+  ) as MarketQuote[];
+
+  if (!quotes.length) {
+    throw new Error(
+      "No live quotes were returned. Check the API key or provider support for your symbols."
+    );
+  }
+
+  const baseCurrencies = Array.from(
+    new Set(
+      (portfolioRows ?? [])
+        .map((row) => String(row.base_currency ?? "RON").toUpperCase())
+        .filter(Boolean)
+    )
+  );
+  const quoteCurrencies = Array.from(
+    new Set(quotes.map((quote) => quote.currency.toUpperCase()))
+  );
+
+  for (const quoteCurrency of quoteCurrencies) {
+    for (const baseCurrency of baseCurrencies) {
+      if (quoteCurrency !== baseCurrency) {
+        await service.getFxRate(quoteCurrency, baseCurrency);
+      }
+    }
+  }
+
+  revalidatePath("/dashboard");
+  revalidatePath("/portfolio");
+  revalidatePath("/settings");
+
+  return {
+    refreshed: quotes.length,
+    total: symbols.length,
+  };
+}
+
 export async function signOutAction() {
   const supabase = await createSupabaseServerClient();
 
@@ -540,92 +644,56 @@ export async function refreshPortfolioQuotesAction(formData: FormData) {
   let redirectUrl = "/settings?message=Quotes%20refreshed";
 
   try {
-    await ensurePortfolioAccess(supabase, user.id, parsed.data.portfolioId);
-    const [{ data: settingRows }, { data: holdings }, { data: portfolioRows }] =
-      await Promise.all([
-        supabase
-          .from("market_data_settings")
-          .select("preferred_provider, quote_refresh_interval_seconds")
-          .eq("user_id", user.id)
-          .eq("portfolio_id", parsed.data.portfolioId)
-          .limit(1),
-        supabase
-          .from("holdings")
-          .select("symbol")
-          .eq("user_id", user.id)
-          .eq("portfolio_id", parsed.data.portfolioId),
-        supabase
-          .from("portfolios")
-          .select("base_currency")
-          .eq("user_id", user.id)
-          .eq("id", parsed.data.portfolioId)
-          .limit(1),
-      ]);
-    const preferredProvider = String(
-      settingRows?.[0]?.preferred_provider ?? "auto"
-    );
-    const quoteRefreshIntervalSeconds = Math.min(
-      3600,
-      Math.max(
-        60,
-        Number(settingRows?.[0]?.quote_refresh_interval_seconds ?? 120)
-      )
-    );
-    const providers = await configuredMarketProviders(
+    const result = await refreshQuotesForUserHoldings({
       supabase,
-      user.id,
-      preferredProvider
-    );
-
-    if (!providers.length) {
-      throw new Error("Configure at least one market data API key first.");
-    }
-
-    const symbols = Array.from(
-      new Set((holdings ?? []).map((row) => String(row.symbol ?? "").toUpperCase()).filter(Boolean))
-    );
-
-    if (!symbols.length) {
-      throw new Error("No holdings to refresh.");
-    }
-
-    const service = new MarketDataService(
-      new SupabaseMarketDataCache(supabase, user.id),
-      providers,
-      { quoteTtlMs: quoteRefreshIntervalSeconds * 1000 }
-    );
-    const quotes = (await service.refreshMarketData(symbols)).filter(
-      Boolean
-    ) as MarketQuote[];
-
-    if (!quotes.length) {
-      throw new Error(
-        "No live quotes were returned. Check the API key or provider support for your symbols."
-      );
-    }
-
-    const baseCurrency = String(portfolioRows?.[0]?.base_currency ?? "RON");
-    const quoteCurrencies = Array.from(
-      new Set(quotes.map((quote) => quote.currency.toUpperCase()))
-    );
-
-    for (const currency of quoteCurrencies) {
-      if (currency !== baseCurrency.toUpperCase()) {
-        await service.getFxRate(currency, baseCurrency);
-      }
-    }
-
-    revalidatePath("/dashboard");
-    revalidatePath("/portfolio");
-    revalidatePath("/settings");
+      userId: user.id,
+      portfolioId: parsed.data.portfolioId,
+    });
     redirectUrl = `/settings?message=${encodeURIComponent(
-        `Refreshed ${quotes.length} of ${symbols.length} quotes`
+        `Refreshed ${result.refreshed} of ${result.total} quotes`
       )}`;
   } catch (error) {
     redirect(settingsFailureUrl(error));
   }
 
   redirect(redirectUrl);
+}
+
+export async function refreshLiveQuotesAction(portfolioId: string) {
+  const supabase = await createSupabaseServerClient();
+
+  if (!supabase) {
+    return { ok: false, error: "Supabase is not configured." };
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { ok: false, error: "Log in to refresh live quotes." };
+  }
+
+  const parsed = refreshQuotesSchema.safeParse({ portfolioId });
+
+  if (!parsed.success) {
+    return { ok: false, error: "Portfolio not found." };
+  }
+
+  try {
+    const result = await refreshQuotesForUserHoldings({
+      supabase,
+      userId: user.id,
+      portfolioId: parsed.data.portfolioId,
+    });
+
+    return { ok: true, ...result };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "Could not refresh quotes.",
+    };
+  }
 }
 
 export async function saveBrokerCashOverrideAction(formData: FormData) {

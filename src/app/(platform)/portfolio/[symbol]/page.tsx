@@ -6,6 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { CoreSatelliteBar } from "@/components/investments/core-satellite-bar";
 import { ExplainNumber } from "@/components/investments/explain-number";
+import { LiveQuotesRefresher } from "@/components/investments/live-quotes-refresher";
 import { SignedPercent } from "@/components/investments/signed-value";
 import { getStockDetailData } from "@/lib/data";
 import {
@@ -72,6 +73,17 @@ export default async function StockDetailPage({ params }: StockDetailPageProps) 
 
   return (
     <div className="space-y-6">
+      <LiveQuotesRefresher
+        enabled={Boolean(
+          !workspace.isLocked &&
+            workspace.marketDataSettings?.livePricesEnabled &&
+            workspace.marketDataSettings.valuationMode === "live_prices"
+        )}
+        portfolioId={workspace.activePortfolio.id}
+        intervalSeconds={
+          workspace.marketDataSettings?.quoteRefreshIntervalSeconds ?? 120
+        }
+      />
       <Button asChild variant="ghost" size="sm">
         <Link href="/portfolio">
           <ArrowLeft className="size-4" aria-hidden="true" />
